@@ -3,10 +3,15 @@
  */
 
 import * as readline from 'readline';
-import { saveConfig, getConfigPath, getDataDir } from '../../state/config.js';
+import { loadConfig, saveConfig, getConfigPath, getDataDir } from '../../state/config.js';
 import { installLaunchAgent } from '../../daemon/launchagent.js';
 import type { Config, SyncType } from '../../types/index.js';
 import { ALL_SYNC_TYPES } from '../../types/index.js';
+
+function maskToken(token: string): string {
+  if (token.length <= 8) return '****';
+  return token.slice(0, 4) + '...' + token.slice(-4);
+}
 
 function prompt(question: string): Promise<string> {
   const rl = readline.createInterface({
@@ -24,7 +29,30 @@ function prompt(question: string): Promise<string> {
 
 export async function initCommand(): Promise<void> {
   console.log('\n🔧 github-things-sync setup\n');
+
+  // Check for existing config
+  const existing = loadConfig();
+  if (existing) {
+    console.log('⚠️  Existing configuration found.\n');
+    console.log('Current settings:');
+    console.log(`  GitHub Token:  ${maskToken(existing.githubToken)}`);
+    console.log(`  Things Token:  ${maskToken(existing.thingsAuthToken)}`);
+    console.log(`  Project:       ${existing.thingsProject}`);
+    console.log(`  Poll Interval: ${existing.pollInterval}s`);
+    console.log(`  Sync Types:    ${existing.syncTypes?.join(', ') || 'all'}`);
+    console.log(`  Autostart:     ${existing.autoStart ? 'yes' : 'no'}\n`);
+
+    const overwrite = await prompt('Reconfigure? [y/N]: ');
+    if (overwrite.toLowerCase() !== 'y') {
+      console.log('\n✅ Keeping existing configuration.');
+      console.log('Use `github-things-sync config` to update individual settings.\n');
+      return;
+    }
+    console.log('');
+  }
+
   console.log('This wizard will configure the sync between GitHub and Things 3.\n');
+  console.log('Press Enter to keep existing value (shown in brackets).\n');
 
   // Step 1: GitHub Token
   console.log('Step 1: GitHub Personal Access Token');
@@ -32,7 +60,11 @@ export async function initCommand(): Promise<void> {
   console.log('Create a token at: https://github.com/settings/tokens');
   console.log('Required scope: repo\n');
 
-  const githubToken = await prompt('GitHub Token: ');
+  const githubTokenPrompt = existing
+    ? `GitHub Token [${maskToken(existing.githubToken)}]: `
+    : 'GitHub Token: ';
+  const githubTokenInput = await prompt(githubTokenPrompt);
+  const githubToken = githubTokenInput || existing?.githubToken;
   if (!githubToken) {
     console.error('❌ GitHub token is required');
     process.exit(1);
@@ -43,7 +75,11 @@ export async function initCommand(): Promise<void> {
   console.log('─────────────────────────');
   console.log('Find it in: Things → Settings → General → Things URLs → Manage\n');
 
-  const thingsAuthToken = await prompt('Things Auth Token: ');
+  const thingsTokenPrompt = existing
+    ? `Things Auth Token [${maskToken(existing.thingsAuthToken)}]: `
+    : 'Things Auth Token: ';
+  const thingsTokenInput = await prompt(thingsTokenPrompt);
+  const thingsAuthToken = thingsTokenInput || existing?.thingsAuthToken;
   if (!thingsAuthToken) {
     console.error('❌ Things auth token is required for auto-completing tasks');
     process.exit(1);
@@ -54,14 +90,16 @@ export async function initCommand(): Promise<void> {
   console.log('──────────────────────');
   console.log('Tasks will be created in this project (must exist in Things)\n');
 
-  const thingsProject = await prompt('Project name [GitHub]: ') || 'GitHub';
+  const projectDefault = existing?.thingsProject || 'GitHub';
+  const thingsProject = await prompt(`Project name [${projectDefault}]: `) || projectDefault;
 
   // Step 4: Poll Interval
   console.log('\nStep 4: Poll Interval');
   console.log('─────────────────────');
   console.log('How often to check GitHub for updates (in seconds)\n');
 
-  const pollIntervalStr = await prompt('Interval [300]: ') || '300';
+  const intervalDefault = existing?.pollInterval || 300;
+  const pollIntervalStr = await prompt(`Interval [${intervalDefault}]: `) || String(intervalDefault);
   const pollInterval = Number.parseInt(pollIntervalStr, 10);
 
   // Step 5: Sync Types
@@ -73,7 +111,8 @@ export async function initCommand(): Promise<void> {
   console.log('  3. issues-assigned - Issues assigned to you');
   console.log('  4. issues-created  - Issues you created\n');
 
-  const syncTypesInput = await prompt('Sync types (comma-separated, or "all") [all]: ') || 'all';
+  const syncTypesDefault = existing?.syncTypes?.join(', ') || 'all';
+  const syncTypesInput = await prompt(`Sync types [${syncTypesDefault}]: `) || syncTypesDefault;
 
   let syncTypes: SyncType[];
   if (syncTypesInput.toLowerCase() === 'all') {
@@ -93,8 +132,12 @@ export async function initCommand(): Promise<void> {
   console.log('──────────────────');
   console.log('Start automatically when you log in to your Mac?\n');
 
-  const autoStartStr = await prompt('Enable auto-start? [Y/n]: ');
-  const autoStart = autoStartStr.toLowerCase() !== 'n';
+  const autoStartDefault = existing?.autoStart !== false;
+  const autoStartPrompt = autoStartDefault ? 'Enable auto-start? [Y/n]: ' : 'Enable auto-start? [y/N]: ';
+  const autoStartStr = await prompt(autoStartPrompt);
+  const autoStart = autoStartStr === ''
+    ? autoStartDefault
+    : autoStartStr.toLowerCase() !== 'n';
 
   // Save config
   const config: Config = {
