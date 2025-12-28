@@ -31,17 +31,21 @@ export async function startCommand(): Promise<void> {
     }
   }
 
-  // Find the daemon script path
-  const daemonScript = path.join(
-    path.dirname(new URL(import.meta.url).pathname),
-    '../../daemon/index.js'
-  );
+  // Find the daemon script path (.ts for dev, .js for production)
+  const scriptDir = path.dirname(new URL(import.meta.url).pathname);
+  const tsScript = path.join(scriptDir, '../../daemon/index.ts');
+  const jsScript = path.join(scriptDir, '../../daemon/index.js');
+
+  // Use tsx for .ts files, node for compiled .js
+  const useTs = fs.existsSync(tsScript);
+  const daemonScript = useTs ? tsScript : jsScript;
+  const runtime = useTs ? 'tsx' : 'node';
 
   // Start daemon as detached process
   const out = fs.openSync(logFile, 'a');
   const err = fs.openSync(logFile, 'a');
 
-  const child = spawn('node', [daemonScript], {
+  const child = spawn(runtime, [daemonScript], {
     detached: true,
     stdio: ['ignore', out, err],
     env: { ...process.env },

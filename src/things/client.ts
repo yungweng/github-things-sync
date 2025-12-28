@@ -112,7 +112,28 @@ export class ThingsClient {
     const rawId = stdout.trim();
     // AppleScript returns "to do id XYZ", extract just the ID
     const match = rawId.match(/to do id (.+)/);
-    return match ? match[1] : rawId;
+    const thingsId = match ? match[1] : rawId;
+
+    // Set "when=today" via URL scheme (AppleScript can't do this reliably)
+    await this.setTaskToToday(thingsId);
+
+    return thingsId;
+  }
+
+  /**
+   * Set a task to appear in Today using URL scheme
+   */
+  private async setTaskToToday(thingsId: string): Promise<void> {
+    const params = new URLSearchParams({
+      id: thingsId,
+      'auth-token': this.authToken,
+      when: 'today',
+    });
+
+    const url = `things:///update?${params.toString()}`;
+    await execAsync(`open "${url}"`);
+    // Small delay to let Things process the update
+    await new Promise((resolve) => setTimeout(resolve, 100));
   }
 
   /**
