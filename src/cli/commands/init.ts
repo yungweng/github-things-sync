@@ -57,7 +57,8 @@ export async function initCommand(): Promise<void> {
   // Step 1: GitHub Token
   console.log('Step 1: GitHub Personal Access Token');
   console.log('─────────────────────────────────────');
-  console.log('Create a token at: https://github.com/settings/tokens');
+  console.log('Create a classic token at: https://github.com/settings/tokens/new');
+  console.log('(Fine-grained tokens may not work with organization repos)');
   console.log('Required scope: repo\n');
 
   const githubTokenPrompt = existing
