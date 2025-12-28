@@ -6,7 +6,8 @@ import * as readline from 'readline';
 import { Octokit } from '@octokit/rest';
 import { loadConfig, saveConfig } from '../../state/config.js';
 import { installLaunchAgent, uninstallLaunchAgent } from '../../daemon/launchagent.js';
-import type { Config } from '../../types/index.js';
+import type { Config, SyncType } from '../../types/index.js';
+import { ALL_SYNC_TYPES } from '../../types/index.js';
 
 function prompt(question: string): Promise<string> {
   const rl = readline.createInterface({
@@ -28,6 +29,7 @@ interface ConfigOptions {
   project?: string;
   githubToken?: string;
   thingsToken?: string;
+  syncTypes?: string;
   verify?: boolean;
   show?: boolean;
 }
@@ -112,6 +114,24 @@ export async function configCommand(options: ConfigOptions): Promise<void> {
     changed = true;
   }
 
+  if (options.syncTypes !== undefined) {
+    let syncTypes: SyncType[];
+    if (options.syncTypes.toLowerCase() === 'all') {
+      syncTypes = [...ALL_SYNC_TYPES];
+    } else {
+      const requested = options.syncTypes.split(',').map(s => s.trim()) as SyncType[];
+      const valid = requested.filter(t => ALL_SYNC_TYPES.includes(t));
+      if (valid.length === 0) {
+        console.error('❌ No valid sync types. Use: pr-reviews, prs-created, issues-assigned, issues-created');
+        process.exit(1);
+      }
+      syncTypes = valid;
+    }
+    config.syncTypes = syncTypes;
+    console.log(`✅ Sync types set to: ${syncTypes.join(', ')}`);
+    changed = true;
+  }
+
   if (changed) {
     saveConfig(config);
     console.log('\n💾 Config saved. Restart daemon for changes to take effect.');
@@ -125,6 +145,7 @@ async function showConfig(config: Config): Promise<void> {
   console.log(`Project:      ${config.thingsProject}`);
   console.log(`Poll interval: ${config.pollInterval}s (${config.pollInterval / 60} min)`);
   console.log(`Autostart:    ${config.autoStart ? '✅ enabled' : '❌ disabled'}`);
+  console.log(`Sync types:   ${config.syncTypes?.join(', ') || 'all (default)'}`);
   console.log('');
   console.log('Tokens');
   console.log('──────');
@@ -138,6 +159,7 @@ async function showConfig(config: Config): Promise<void> {
   console.log('  --project=NAME        Set Things project name');
   console.log('  --github-token=prompt Update GitHub token');
   console.log('  --things-token=prompt Update Things token');
+  console.log('  --sync-types=TYPES    Set sync types (comma-separated or "all")');
   console.log('  --verify              Verify tokens work');
   console.log('');
 }

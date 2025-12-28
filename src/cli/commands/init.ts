@@ -5,7 +5,8 @@
 import * as readline from 'readline';
 import { saveConfig, getConfigPath, getDataDir } from '../../state/config.js';
 import { installLaunchAgent } from '../../daemon/launchagent.js';
-import type { Config } from '../../types/index.js';
+import type { Config, SyncType } from '../../types/index.js';
+import { ALL_SYNC_TYPES } from '../../types/index.js';
 
 function prompt(question: string): Promise<string> {
   const rl = readline.createInterface({
@@ -63,8 +64,32 @@ export async function initCommand(): Promise<void> {
   const pollIntervalStr = await prompt('Interval [300]: ') || '300';
   const pollInterval = Number.parseInt(pollIntervalStr, 10);
 
-  // Step 5: Auto-start
-  console.log('\nStep 5: Auto-start');
+  // Step 5: Sync Types
+  console.log('\nStep 5: Sync Types');
+  console.log('──────────────────');
+  console.log('Which GitHub items should be synced to Things?\n');
+  console.log('  1. pr-reviews      - PRs where you are requested as reviewer');
+  console.log('  2. prs-created     - PRs you created');
+  console.log('  3. issues-assigned - Issues assigned to you');
+  console.log('  4. issues-created  - Issues you created\n');
+
+  const syncTypesInput = await prompt('Sync types (comma-separated, or "all") [all]: ') || 'all';
+
+  let syncTypes: SyncType[];
+  if (syncTypesInput.toLowerCase() === 'all') {
+    syncTypes = [...ALL_SYNC_TYPES];
+  } else {
+    const requested = syncTypesInput.split(',').map(s => s.trim()) as SyncType[];
+    const valid = requested.filter(t => ALL_SYNC_TYPES.includes(t));
+    if (valid.length === 0) {
+      console.error('❌ No valid sync types provided. Use: pr-reviews, prs-created, issues-assigned, issues-created');
+      process.exit(1);
+    }
+    syncTypes = valid;
+  }
+
+  // Step 6: Auto-start
+  console.log('\nStep 6: Auto-start');
   console.log('──────────────────');
   console.log('Start automatically when you log in to your Mac?\n');
 
@@ -78,6 +103,7 @@ export async function initCommand(): Promise<void> {
     thingsAuthToken,
     pollInterval,
     autoStart,
+    syncTypes,
   };
 
   saveConfig(config);

@@ -34,7 +34,7 @@ export async function runSync(
     errors: [],
   };
 
-  const github = new GitHubClient(config.githubToken);
+  const github = new GitHubClient(config.githubToken, config.syncTypes);
   const things = new ThingsClient(config.thingsProject, config.thingsAuthToken);
 
   try {

@@ -9,6 +9,17 @@ export type GitHubItemType =
   | 'issue-assigned' // Issue assigned to you
   | 'issue-created'; // Issue you created
 
+// Sync type identifiers for config
+export type SyncType = 'pr-reviews' | 'prs-created' | 'issues-assigned' | 'issues-created';
+
+// All available sync types (for validation)
+export const ALL_SYNC_TYPES: SyncType[] = [
+  'pr-reviews',
+  'prs-created',
+  'issues-assigned',
+  'issues-created',
+];
+
 // A GitHub item (PR or Issue)
 export interface GitHubItem {
   id: number;
@@ -47,6 +58,7 @@ export interface Config {
   thingsAuthToken: string;    // Required for updating tasks
   pollInterval: number;       // Seconds, default: 300 (5 min)
   autoStart: boolean;         // Install LaunchAgent
+  syncTypes: SyncType[];      // Which item types to sync (default: all)
 }
 
 // Daemon status

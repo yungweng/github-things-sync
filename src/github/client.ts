@@ -3,14 +3,16 @@
  */
 
 import { Octokit } from '@octokit/rest';
-import type { GitHubItem, GitHubItemType } from '../types/index.js';
+import type { GitHubItem, GitHubItemType, SyncType } from '../types/index.js';
 
 export class GitHubClient {
   private octokit: Octokit;
   private username: string | null = null;
+  private syncTypes: SyncType[];
 
-  constructor(token: string) {
+  constructor(token: string, syncTypes?: SyncType[]) {
     this.octokit = new Octokit({ auth: token });
+    this.syncTypes = syncTypes || ['pr-reviews', 'prs-created', 'issues-assigned', 'issues-created'];
   }
 
   async getUsername(): Promise<string> {
@@ -28,16 +30,27 @@ export class GitHubClient {
     const username = await this.getUsername();
     const items: GitHubItem[] = [];
 
-    // Fetch in parallel
-    const [prReviews, prsCreated, issuesAssigned, issuesCreated] =
-      await Promise.all([
-        this.fetchPRReviewRequests(username),
-        this.fetchPRsCreated(username),
-        this.fetchIssuesAssigned(username),
-        this.fetchIssuesCreated(username),
-      ]);
+    // Build list of fetch promises based on enabled sync types
+    const fetches: Promise<GitHubItem[]>[] = [];
 
-    items.push(...prReviews, ...prsCreated, ...issuesAssigned, ...issuesCreated);
+    if (this.syncTypes.includes('pr-reviews')) {
+      fetches.push(this.fetchPRReviewRequests(username));
+    }
+    if (this.syncTypes.includes('prs-created')) {
+      fetches.push(this.fetchPRsCreated(username));
+    }
+    if (this.syncTypes.includes('issues-assigned')) {
+      fetches.push(this.fetchIssuesAssigned(username));
+    }
+    if (this.syncTypes.includes('issues-created')) {
+      fetches.push(this.fetchIssuesCreated(username));
+    }
+
+    // Fetch in parallel
+    const results = await Promise.all(fetches);
+    for (const result of results) {
+      items.push(...result);
+    }
 
     return items;
   }

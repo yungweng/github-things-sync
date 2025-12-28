@@ -6,6 +6,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import type { Config } from '../types/index.js';
+import { ALL_SYNC_TYPES } from '../types/index.js';
 
 const DATA_DIR = path.join(os.homedir(), '.github-things-sync');
 const CONFIG_FILE = path.join(DATA_DIR, 'config.json');
@@ -31,7 +32,14 @@ export function loadConfig(): Config | null {
 
   try {
     const content = fs.readFileSync(CONFIG_FILE, 'utf-8');
-    return JSON.parse(content) as Config;
+    const config = JSON.parse(content) as Config;
+
+    // Migration: add syncTypes if missing (for existing configs)
+    if (!config.syncTypes) {
+      config.syncTypes = [...ALL_SYNC_TYPES];
+    }
+
+    return config;
   } catch {
     return null;
   }

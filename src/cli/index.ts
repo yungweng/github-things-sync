@@ -53,6 +53,7 @@ program
   .option('--project <name>', 'Set Things project name')
   .option('--github-token <token>', 'Update GitHub token (use "prompt" for interactive)')
   .option('--things-token <token>', 'Update Things token (use "prompt" for interactive)')
+  .option('--sync-types <types>', 'Set sync types (comma-separated or "all")')
   .option('--verify', 'Verify tokens work')
   .action(configCommand);
 
