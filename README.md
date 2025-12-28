@@ -77,37 +77,57 @@ github-things-sync config --things-token=prompt
 
 ## Architecture
 
+```mermaid
+flowchart TB
+    subgraph mac["🖥️ Your Mac"]
+        subgraph app["github-things-sync"]
+            CLI["**CLI**\ninit · start · stop\nstatus · sync · config"]
+            Daemon["**Daemon**\nPolls every X seconds"]
+            State[("**State**\nconfig.json\nstate.json")]
+        end
+        Things["**Things 3**\n📋 Tasks in Project\n⭐ Appears in Today"]
+    end
+
+    GitHub["**GitHub**\n🔀 Pull Requests\n🎫 Issues"]
+
+    CLI --> Daemon
+    Daemon <--> State
+    Daemon -->|"AppleScript\n+ URL Scheme"| Things
+    Daemon <-->|"REST API\n(Octokit)"| GitHub
+
+    style mac fill:#1a1a2e,stroke:#16213e,color:#fff
+    style app fill:#16213e,stroke:#0f3460,color:#fff
+    style Things fill:#4a69bd,stroke:#1e3799,color:#fff
+    style GitHub fill:#24292e,stroke:#444,color:#fff
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Your Mac                                 │
-│                                                                 │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │                    github-things-sync                     │  │
-│  │                                                           │  │
-│  │  ┌─────────────┐    ┌─────────────┐    ┌──────────────┐  │  │
-│  │  │   CLI       │    │   Daemon    │    │   State      │  │  │
-│  │  │             │    │             │    │   (JSON)     │  │  │
-│  │  │ • init      │───▶│ • Poll Loop │◀──▶│              │  │  │
-│  │  │ • start     │    │ • Configur- │    │ • Mappings   │  │  │
-│  │  │ • stop      │    │   able      │    │ • Config     │  │  │
-│  │  │ • status    │    └──────┬──────┘    └──────────────┘  │  │
-│  │  │ • sync      │           │                              │  │
-│  │  │ • config    │           │                              │  │
-│  │  └─────────────┘           │                              │  │
-│  │                            ▼                              │  │
-│  │                 ┌─────────────────────┐                   │  │
-│  │                 │   Things 3          │                   │  │
-│  │                 │   (AppleScript +    │                   │  │
-│  │                 │    URL Scheme)      │                   │  │
-│  │                 └─────────────────────┘                   │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│                            │                                    │
-│                            │ GitHub REST API                    │
-└────────────────────────────┼────────────────────────────────────┘
-                             ▼
-                   ┌─────────────────────┐
-                   │      GitHub         │
-                   └─────────────────────┘
+
+### Data Flow
+
+```mermaid
+sequenceDiagram
+    participant D as Daemon
+    participant GH as GitHub API
+    participant S as State (JSON)
+    participant T as Things 3
+
+    loop Every X seconds
+        D->>GH: Fetch open PRs & Issues
+        GH-->>D: Return items
+
+        D->>S: Check mappings
+
+        alt New item (no mapping)
+            D->>T: Create task (AppleScript)
+            T-->>D: Return task ID
+            D->>T: Set to Today (URL Scheme)
+            D->>S: Save mapping
+        end
+
+        alt Item closed (has mapping)
+            D->>T: Complete task (URL Scheme)
+            D->>S: Remove mapping
+        end
+    end
 ```
 
 ### How It Works
