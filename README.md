@@ -81,24 +81,19 @@ github-things-sync config --things-token=prompt
 flowchart TB
     subgraph mac["🖥️ Your Mac"]
         subgraph app["github-things-sync"]
-            CLI["**CLI**\ninit · start · stop\nstatus · sync · config"]
-            Daemon["**Daemon**\nPolls every X seconds"]
-            State[("**State**\nconfig.json\nstate.json")]
+            CLI[CLI]
+            Daemon[Daemon]
+            State[(State)]
         end
-        Things["**Things 3**\n📋 Tasks in Project\n⭐ Appears in Today"]
+        Things[Things 3]
     end
 
-    GitHub["**GitHub**\n🔀 Pull Requests\n🎫 Issues"]
+    GitHub[GitHub]
 
-    CLI --> Daemon
-    Daemon <--> State
-    Daemon -->|"AppleScript\n+ URL Scheme"| Things
-    Daemon <-->|"REST API\n(Octokit)"| GitHub
-
-    style mac fill:#1a1a2e,stroke:#16213e,color:#fff
-    style app fill:#16213e,stroke:#0f3460,color:#fff
-    style Things fill:#4a69bd,stroke:#1e3799,color:#fff
-    style GitHub fill:#24292e,stroke:#444,color:#fff
+    CLI -->|start/stop| Daemon
+    Daemon <-->|read/write| State
+    Daemon -->|create tasks| Things
+    Daemon <-->|poll PRs & Issues| GitHub
 ```
 
 ### Data Flow
