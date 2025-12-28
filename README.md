@@ -18,7 +18,7 @@ flowchart LR
 ## Installation
 
 ```bash
-git clone https://github.com/yungweng/github-things-sync.git
+git clone https://github.com/moto-nrw/github-things-sync.git
 cd github-things-sync
 npm install && npm run build && npm install -g .
 ```

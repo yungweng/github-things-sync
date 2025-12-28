@@ -21,11 +21,11 @@
     "todo",
     "sync"
   ],
-  "author": "yonnock",
+  "author": "yungweng",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yonnock/github-things-sync.git"
+    "url": "https://github.com/moto-nrw/github-things-sync.git"
   },
   "engines": {
     "node": ">=18.0.0"
