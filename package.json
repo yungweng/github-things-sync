@@ -1,0 +1,44 @@
+{
+  "name": "github-things-sync",
+  "version": "0.1.0",
+  "description": "Sync GitHub PRs and Issues to Things 3 on macOS",
+  "type": "module",
+  "bin": {
+    "github-things-sync": "./dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli/index.ts",
+    "lint": "eslint src/",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "github",
+    "things",
+    "things3",
+    "macos",
+    "productivity",
+    "todo",
+    "sync"
+  ],
+  "author": "yonnock",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yonnock/github-things-sync.git"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@octokit/rest": "^21.0.0",
+    "commander": "^12.0.0",
+    "open": "^10.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "eslint": "^9.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}
