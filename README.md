@@ -4,33 +4,35 @@ Sync GitHub PRs and Issues to Things 3 on macOS. Automatically creates tasks whe
 
 ## Features
 
-- **PR Review Requests** → Task "Review: [PR Title]"
+- **PR Review Requests** → Task "Review: [PR Title]" appears in Today
 - **PRs you created** → Task "PR: [PR Title]" with status tracking
 - **Issues assigned to you** → Task "Issue: [Title]"
 - **Issues you created** → Task "My Issue: [Title]"
-- **Auto-close** → Tasks complete when PRs are merged or Issues closed
-- **Runs as daemon** → Polls every 5 minutes, starts automatically on login
+- **Auto-close** → Tasks complete automatically when PRs are merged or Issues closed
+- **Runs as daemon** → Polls GitHub, starts automatically on login
+- **Configurable** → Adjust poll interval, project name, tokens via CLI
 
 ## Installation
 
 ```bash
-# Install globally
-npm install -g github-things-sync
-
-# Or run directly with npx
-npx github-things-sync init
+# Clone and install globally
+git clone https://github.com/yungweng/github-things-sync.git
+cd github-things-sync
+npm install
+npm run build
+npm install -g .
 ```
 
 ## Quick Start
 
 ```bash
-# 1. Setup (creates config, installs LaunchAgent)
+# 1. Setup (creates config, installs LaunchAgent for autostart)
 github-things-sync init
 
 # 2. Start the daemon
 github-things-sync start
 
-# That's it! Tasks will appear in Things under "GitHub" project
+# That's it! Tasks will appear in Things under "GitHub" project + Today
 ```
 
 ## CLI Commands
@@ -42,6 +44,36 @@ github-things-sync start
 | `github-things-sync stop` | Stop the daemon |
 | `github-things-sync status` | Show sync status and recent activity |
 | `github-things-sync sync` | Run a single sync (no daemon) |
+| `github-things-sync sync -v` | Run sync with verbose output |
+| `github-things-sync config` | View current settings |
+| `github-things-sync config --verify` | Verify tokens work |
+| `github-things-sync config --interval=120` | Set poll interval (seconds) |
+| `github-things-sync config --autostart=false` | Disable autostart |
+| `github-things-sync config --project=Work` | Change Things project |
+
+## Config Options
+
+```bash
+# View current config
+github-things-sync config
+
+# Verify tokens are valid
+github-things-sync config --verify
+
+# Change poll interval (minimum 60 seconds)
+github-things-sync config --interval=120
+
+# Enable/disable autostart on login
+github-things-sync config --autostart=true
+github-things-sync config --autostart=false
+
+# Change Things project name
+github-things-sync config --project="My Project"
+
+# Update tokens (interactive)
+github-things-sync config --github-token=prompt
+github-things-sync config --things-token=prompt
+```
 
 ## Architecture
 
@@ -56,15 +88,17 @@ github-things-sync start
 │  │  │   CLI       │    │   Daemon    │    │   State      │  │  │
 │  │  │             │    │             │    │   (JSON)     │  │  │
 │  │  │ • init      │───▶│ • Poll Loop │◀──▶│              │  │  │
-│  │  │ • start     │    │ • Every 5m  │    │ • Mappings   │  │  │
-│  │  │ • stop      │    │             │    │ • Config     │  │  │
+│  │  │ • start     │    │ • Configur- │    │ • Mappings   │  │  │
+│  │  │ • stop      │    │   able      │    │ • Config     │  │  │
 │  │  │ • status    │    └──────┬──────┘    └──────────────┘  │  │
 │  │  │ • sync      │           │                              │  │
+│  │  │ • config    │           │                              │  │
 │  │  └─────────────┘           │                              │  │
 │  │                            ▼                              │  │
 │  │                 ┌─────────────────────┐                   │  │
 │  │                 │   Things 3          │                   │  │
-│  │                 │   (URL Scheme)      │                   │  │
+│  │                 │   (AppleScript +    │                   │  │
+│  │                 │    URL Scheme)      │                   │  │
 │  │                 └─────────────────────┘                   │  │
 │  └──────────────────────────────────────────────────────────┘  │
 │                            │                                    │
@@ -76,87 +110,28 @@ github-things-sync start
                    └─────────────────────┘
 ```
 
-### Components
+### How It Works
 
-#### CLI (`src/cli/`)
-Entry point for all user commands. Uses [Commander.js](https://github.com/tj/commander.js) for argument parsing.
+1. **Daemon polls GitHub** for your open PRs and Issues
+2. **New items** → Creates task in Things via AppleScript (gets task ID) + sets to Today via URL Scheme
+3. **Closed items** → Completes task in Things via URL Scheme
+4. **State tracked** in `~/.github-things-sync/state.json` to avoid duplicates
 
-#### Daemon (`src/daemon/`)
-Background process that:
-1. Polls GitHub API every 5 minutes
-2. Compares with local state
-3. Creates/updates/completes Things tasks
-4. Persists state to JSON
+### GitHub Queries
 
-#### GitHub Client (`src/github/`)
-Wrapper around GitHub REST API using [Octokit](https://github.com/octokit/octokit.js). Fetches:
-- `GET /search/issues?q=review-requested:@me` (PR review requests)
-- `GET /search/issues?q=author:@me+is:pr` (PRs you created)
-- `GET /search/issues?q=assignee:@me+is:issue` (Assigned issues)
-- `GET /search/issues?q=author:@me+is:issue` (Issues you created)
-
-#### Things Client (`src/things/`)
-Creates and updates tasks via Things URL Scheme:
-- `things:///add?title=...&when=today&list=GitHub`
-- `things:///update?id=...&completed=true`
-
-Requires Things URL Scheme to be enabled: Things → Settings → General → Enable Things URLs
-
-#### State (`src/state/`)
-JSON file at `~/.github-things-sync/state.json`:
-```json
-{
-  "mappings": {
-    "github:pr:123456": {
-      "thingsId": "ABC-DEF-123",
-      "type": "pr-review",
-      "title": "Review: Add feature X",
-      "url": "https://github.com/org/repo/pull/42",
-      "createdAt": "2024-01-15T10:30:00Z"
-    }
-  },
-  "lastSync": "2024-01-15T12:00:00Z"
-}
-```
-
-#### Config (`~/.github-things-sync/config.json`)
-```json
-{
-  "githubToken": "ghp_...",
-  "thingsProject": "GitHub",
-  "thingsAuthToken": "...",
-  "pollInterval": 300,
-  "autoStart": true
-}
-```
-
-### Data Flow
-
-#### Creating a Task
-```
-1. GitHub API returns new PR review request
-2. Check state.mappings → not found
-3. Call Things URL: things:///add?title=Review: Fix bug&when=today&list=GitHub
-4. Things returns x-things-id
-5. Save to state.mappings: { "github:pr:123": { thingsId: "...", ... } }
-```
-
-#### Completing a Task
-```
-1. GitHub API returns PR is merged
-2. Check state.mappings → found thingsId
-3. Call Things URL: things:///update?id={thingsId}&auth-token=...&completed=true
-4. Remove from state.mappings
-```
+- `is:pr is:open review-requested:@me` → PR review requests
+- `is:pr is:open author:@me` → PRs you created
+- `is:issue is:open assignee:@me` → Issues assigned to you
+- `is:issue is:open author:@me` → Issues you created
 
 ## Requirements
 
-- macOS (Things 3 is macOS/iOS only)
+- macOS (Things 3 is macOS only)
 - Things 3 with URL Scheme enabled
 - Node.js 18+
 - GitHub Personal Access Token with `repo` scope
 
-## Configuration
+## Setup Details
 
 ### GitHub Token
 
@@ -167,32 +142,54 @@ Create a [Personal Access Token](https://github.com/settings/tokens) with `repo`
 Required for updating/completing tasks. Find it in:
 Things → Settings → General → Things URLs → Manage
 
+### Things Project
+
+Create a project called "GitHub" in Things (or use `--project` to specify a different name).
+
 ## File Locations
 
 | File | Purpose |
 |------|---------|
-| `~/.github-things-sync/config.json` | User configuration |
-| `~/.github-things-sync/state.json` | Sync state and mappings |
+| `~/.github-things-sync/config.json` | User configuration (tokens, settings) |
+| `~/.github-things-sync/state.json` | Sync state and task mappings |
 | `~/.github-things-sync/daemon.log` | Daemon logs |
+| `~/.github-things-sync/daemon.pid` | Running daemon PID |
 | `~/Library/LaunchAgents/com.github-things-sync.plist` | Autostart config |
 
 ## Development
 
 ```bash
 # Clone
-git clone https://github.com/yonnock/github-things-sync.git
+git clone https://github.com/yungweng/github-things-sync.git
 cd github-things-sync
 
 # Install dependencies
 npm install
 
-# Build
+# Run in development (TypeScript directly)
+npm run dev -- init
+npm run dev -- sync -v
+npm run dev -- config --verify
+
+# Build for production
 npm run build
 
-# Run locally
-npm run dev -- init
-npm run dev -- sync
+# Install globally
+npm install -g .
 ```
+
+## Troubleshooting
+
+**Tasks not appearing in Today?**
+- Make sure Things URL Scheme is enabled: Things → Settings → General → Enable Things URLs
+
+**Daemon not starting?**
+- Check logs: `cat ~/.github-things-sync/daemon.log`
+- Verify config: `github-things-sync config --verify`
+
+**Tasks not auto-completing?**
+- Ensure Things Auth Token is set correctly
+- The token is found in: Things → Settings → General → Things URLs → Manage
 
 ## License
 
