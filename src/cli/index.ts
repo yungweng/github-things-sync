@@ -40,7 +40,7 @@ if (notifier.update) {
 }
 
 // Detect first run: lastUpdateCheck was just set by constructor (within last second)
-const lastCheck = notifier.config?.get('lastUpdateCheck') ?? 0;
+const lastCheck = (notifier.config?.get('lastUpdateCheck') as number) ?? 0;
 const isFirstRun = Date.now() - lastCheck < 1000;
 const intervalPassed = Date.now() - lastCheck >= updateCheckInterval;
 
