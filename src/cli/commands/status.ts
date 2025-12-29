@@ -4,13 +4,14 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import chalk from 'chalk';
 import { getDataDir, loadConfig } from '../../state/config.js';
 import { loadState } from '../../state/state.js';
 
 export async function statusCommand(): Promise<void> {
   const config = loadConfig();
   if (!config) {
-    console.error('❌ Not configured. Run `github-things-sync init` first.');
+    console.error(chalk.red('❌ Not configured. Run `github-things-sync init` first.'));
     process.exit(1);
   }
 
@@ -18,9 +19,9 @@ export async function statusCommand(): Promise<void> {
   const state = loadState();
 
   // Daemon status
-  console.log('\n📊 github-things-sync status\n');
-  console.log('Daemon');
-  console.log('──────');
+  console.log(chalk.bold('\n📊 github-things-sync status\n'));
+  console.log(chalk.bold('Daemon'));
+  console.log(chalk.dim('──────'));
 
   let isRunning = false;
   let pid: number | null = null;
@@ -36,36 +37,36 @@ export async function statusCommand(): Promise<void> {
   }
 
   if (isRunning) {
-    console.log(`Status:  🟢 Running (PID: ${pid})`);
+    console.log(chalk.dim('Status:   ') + chalk.green('● Running') + chalk.dim(` (PID: ${pid})`));
   } else {
-    console.log('Status:  🔴 Stopped');
+    console.log(chalk.dim('Status:   ') + chalk.red('○ Stopped'));
   }
 
-  console.log(`Interval: ${config.pollInterval}s`);
-  console.log(`Project:  ${config.thingsProject}`);
+  console.log(chalk.dim('Interval: ') + `${config.pollInterval}s`);
+  console.log(chalk.dim('Project:  ') + config.thingsProject);
 
   // Sync status
-  console.log('\nSync');
-  console.log('────');
+  console.log(chalk.bold('\nSync'));
+  console.log(chalk.dim('────'));
 
   if (state.lastSync) {
     const lastSync = new Date(state.lastSync);
     const ago = Math.round((Date.now() - lastSync.getTime()) / 1000);
-    console.log(`Last sync: ${formatTimeAgo(ago)}`);
+    console.log(chalk.dim('Last sync: ') + formatTimeAgo(ago));
   } else {
-    console.log('Last sync: Never');
+    console.log(chalk.dim('Last sync: ') + 'Never');
   }
 
   if (state.lastError) {
-    console.log(`Last error: ${state.lastError}`);
+    console.log(chalk.dim('Last error: ') + chalk.red(state.lastError));
   }
 
   // Task mappings
   const mappings = Object.values(state.mappings);
-  console.log(`\nTracked Tasks: ${mappings.length}`);
+  console.log(chalk.bold(`\nTracked Tasks: `) + mappings.length);
 
   if (mappings.length > 0) {
-    console.log('───────────────');
+    console.log(chalk.dim('───────────────'));
 
     // Group by type
     const byType = {
@@ -76,30 +77,30 @@ export async function statusCommand(): Promise<void> {
     };
 
     if (byType['pr-review'].length > 0) {
-      console.log(`\n🔍 PR Reviews (${byType['pr-review'].length})`);
+      console.log(chalk.cyan(`\n🔍 PR Reviews (${byType['pr-review'].length})`));
       byType['pr-review'].slice(0, 5).forEach((m) => {
-        console.log(`   • ${m.title}`);
+        console.log(chalk.dim('   • ') + m.title);
       });
     }
 
     if (byType['pr-created'].length > 0) {
-      console.log(`\n📝 Your PRs (${byType['pr-created'].length})`);
+      console.log(chalk.cyan(`\n📝 Your PRs (${byType['pr-created'].length})`));
       byType['pr-created'].slice(0, 5).forEach((m) => {
-        console.log(`   • ${m.title}`);
+        console.log(chalk.dim('   • ') + m.title);
       });
     }
 
     if (byType['issue-assigned'].length > 0) {
-      console.log(`\n📌 Assigned Issues (${byType['issue-assigned'].length})`);
+      console.log(chalk.cyan(`\n📌 Assigned Issues (${byType['issue-assigned'].length})`));
       byType['issue-assigned'].slice(0, 5).forEach((m) => {
-        console.log(`   • ${m.title}`);
+        console.log(chalk.dim('   • ') + m.title);
       });
     }
 
     if (byType['issue-created'].length > 0) {
-      console.log(`\n✏️  Your Issues (${byType['issue-created'].length})`);
+      console.log(chalk.cyan(`\n✏️  Your Issues (${byType['issue-created'].length})`));
       byType['issue-created'].slice(0, 5).forEach((m) => {
-        console.log(`   • ${m.title}`);
+        console.log(chalk.dim('   • ') + m.title);
       });
     }
   }

@@ -5,12 +5,13 @@
 import { spawn } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
+import chalk from 'chalk';
 import { getDataDir, loadConfig } from '../../state/config.js';
 
 export async function startCommand(): Promise<void> {
   const config = loadConfig();
   if (!config) {
-    console.error('❌ Not configured. Run `github-things-sync init` first.');
+    console.error(chalk.red('❌ Not configured. Run `github-things-sync init` first.'));
     process.exit(1);
   }
 
@@ -22,8 +23,8 @@ export async function startCommand(): Promise<void> {
     const pid = Number.parseInt(fs.readFileSync(pidFile, 'utf-8').trim(), 10);
     try {
       process.kill(pid, 0); // Check if process exists
-      console.log(`⚠️  Daemon already running (PID: ${pid})`);
-      console.log(`   Use 'github-things-sync stop' to stop it first.`);
+      console.log(chalk.yellow(`⚠️  Daemon already running (PID: ${pid})`));
+      console.log(chalk.dim(`   Use 'github-things-sync stop' to stop it first.`));
       return;
     } catch {
       // Process doesn't exist, clean up stale PID file
@@ -55,11 +56,11 @@ export async function startCommand(): Promise<void> {
     fs.writeFileSync(pidFile, child.pid.toString());
     child.unref();
 
-    console.log(`✅ Daemon started (PID: ${child.pid})`);
-    console.log(`   Polling every ${config.pollInterval} seconds`);
-    console.log(`   Logs: ${logFile}`);
+    console.log(chalk.green(`✅ Daemon started`) + chalk.dim(` (PID: ${child.pid})`));
+    console.log(chalk.dim(`   Polling every ${config.pollInterval} seconds`));
+    console.log(chalk.dim(`   Logs: ${logFile}`));
   } else {
-    console.error('❌ Failed to start daemon');
+    console.error(chalk.red('❌ Failed to start daemon'));
     process.exit(1);
   }
 }

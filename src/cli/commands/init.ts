@@ -2,7 +2,8 @@
  * init command - Interactive setup wizard
  */
 
-import * as readline from 'readline';
+import { input, password, confirm, checkbox } from '@inquirer/prompts';
+import chalk from 'chalk';
 import { loadConfig, saveConfig, getConfigPath, getDataDir } from '../../state/config.js';
 import { installLaunchAgent } from '../../daemon/launchagent.js';
 import type { Config, SyncType } from '../../types/index.js';
@@ -13,132 +14,145 @@ function maskToken(token: string): string {
   return token.slice(0, 4) + '...' + token.slice(-4);
 }
 
-function prompt(question: string): Promise<string> {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
-  return new Promise((resolve) => {
-    rl.question(question, (answer) => {
-      rl.close();
-      resolve(answer.trim());
-    });
-  });
-}
-
 export async function initCommand(): Promise<void> {
-  console.log('\n🔧 github-things-sync setup\n');
+  console.log(chalk.bold('\n🔧 github-things-sync setup\n'));
 
   // Check for existing config
   const existing = loadConfig();
   if (existing) {
-    console.log('⚠️  Existing configuration found.\n');
+    console.log(chalk.yellow('⚠️  Existing configuration found.\n'));
     console.log('Current settings:');
-    console.log(`  GitHub Token:  ${maskToken(existing.githubToken)}`);
-    console.log(`  Things Token:  ${maskToken(existing.thingsAuthToken)}`);
-    console.log(`  Project:       ${existing.thingsProject}`);
-    console.log(`  Poll Interval: ${existing.pollInterval}s`);
-    console.log(`  Sync Types:    ${existing.syncTypes?.join(', ') || 'all'}`);
-    console.log(`  Autostart:     ${existing.autoStart ? 'yes' : 'no'}\n`);
+    console.log(chalk.dim('  GitHub Token:  ') + maskToken(existing.githubToken));
+    console.log(chalk.dim('  Things Token:  ') + maskToken(existing.thingsAuthToken));
+    console.log(chalk.dim('  Project:       ') + existing.thingsProject);
+    console.log(chalk.dim('  Poll Interval: ') + existing.pollInterval + 's');
+    console.log(chalk.dim('  Sync Types:    ') + (existing.syncTypes?.join(', ') || 'all'));
+    console.log(chalk.dim('  Autostart:     ') + (existing.autoStart ? 'yes' : 'no') + '\n');
 
-    const overwrite = await prompt('Reconfigure? [y/N]: ');
-    if (overwrite.toLowerCase() !== 'y') {
-      console.log('\n✅ Keeping existing configuration.');
-      console.log('Use `github-things-sync config` to update individual settings.\n');
+    const overwrite = await confirm({
+      message: 'Reconfigure?',
+      default: false,
+    });
+
+    if (!overwrite) {
+      console.log(chalk.green('\n✅ Keeping existing configuration.'));
+      console.log(chalk.dim('Use `github-things-sync config` to update individual settings.\n'));
       return;
     }
     console.log('');
   }
 
   console.log('This wizard will configure the sync between GitHub and Things 3.\n');
-  console.log('Press Enter to keep existing value (shown in brackets).\n');
 
   // Step 1: GitHub Token
-  console.log('Step 1: GitHub Personal Access Token');
-  console.log('─────────────────────────────────────');
-  console.log('Create a classic token at: https://github.com/settings/tokens/new');
-  console.log('(Fine-grained tokens may not work with organization repos)');
-  console.log('Required scope: repo\n');
+  console.log(chalk.bold('Step 1: GitHub Personal Access Token'));
+  console.log(chalk.dim('─────────────────────────────────────'));
+  console.log(chalk.dim('Create a classic token at: ') + chalk.cyan('https://github.com/settings/tokens/new'));
+  console.log(chalk.dim('(Fine-grained tokens may not work with organization repos)'));
+  console.log(chalk.dim('Required scope: repo\n'));
 
-  const githubTokenPrompt = existing
-    ? `GitHub Token [${maskToken(existing.githubToken)}]: `
-    : 'GitHub Token: ';
-  const githubTokenInput = await prompt(githubTokenPrompt);
-  const githubToken = githubTokenInput || existing?.githubToken;
+  const githubToken = await password({
+    message: 'GitHub Token',
+    mask: '*',
+    validate: (value) => {
+      if (!value && !existing?.githubToken) {
+        return 'GitHub token is required';
+      }
+      return true;
+    },
+  }) || existing?.githubToken;
+
   if (!githubToken) {
-    console.error('❌ GitHub token is required');
+    console.error(chalk.red('❌ GitHub token is required'));
     process.exit(1);
   }
 
   // Step 2: Things Auth Token
-  console.log('\nStep 2: Things Auth Token');
-  console.log('─────────────────────────');
-  console.log('Find it in: Things → Settings → General → Things URLs → Manage\n');
+  console.log(chalk.bold('\nStep 2: Things Auth Token'));
+  console.log(chalk.dim('─────────────────────────'));
+  console.log(chalk.dim('Find it in: Things → Settings → General → Things URLs → Manage\n'));
 
-  const thingsTokenPrompt = existing
-    ? `Things Auth Token [${maskToken(existing.thingsAuthToken)}]: `
-    : 'Things Auth Token: ';
-  const thingsTokenInput = await prompt(thingsTokenPrompt);
-  const thingsAuthToken = thingsTokenInput || existing?.thingsAuthToken;
+  const thingsAuthToken = await password({
+    message: 'Things Auth Token',
+    mask: '*',
+    validate: (value) => {
+      if (!value && !existing?.thingsAuthToken) {
+        return 'Things auth token is required for auto-completing tasks';
+      }
+      return true;
+    },
+  }) || existing?.thingsAuthToken;
+
   if (!thingsAuthToken) {
-    console.error('❌ Things auth token is required for auto-completing tasks');
+    console.error(chalk.red('❌ Things auth token is required'));
     process.exit(1);
   }
 
   // Step 3: Things Project
-  console.log('\nStep 3: Things Project');
-  console.log('──────────────────────');
-  console.log('Tasks will be created in this project (must exist in Things)\n');
+  console.log(chalk.bold('\nStep 3: Things Project'));
+  console.log(chalk.dim('──────────────────────'));
+  console.log(chalk.dim('Tasks will be created in this project (must exist in Things)\n'));
 
-  const projectDefault = existing?.thingsProject || 'GitHub';
-  const thingsProject = await prompt(`Project name [${projectDefault}]: `) || projectDefault;
+  const thingsProject = await input({
+    message: 'Project name',
+    default: existing?.thingsProject || 'GitHub',
+    validate: (value) => {
+      if (!value.trim()) {
+        return 'Project name is required';
+      }
+      return true;
+    },
+  });
 
   // Step 4: Poll Interval
-  console.log('\nStep 4: Poll Interval');
-  console.log('─────────────────────');
-  console.log('How often to check GitHub for updates (in seconds)\n');
+  console.log(chalk.bold('\nStep 4: Poll Interval'));
+  console.log(chalk.dim('─────────────────────'));
+  console.log(chalk.dim('How often to check GitHub for updates (in seconds)\n'));
 
-  const intervalDefault = existing?.pollInterval || 300;
-  const pollIntervalStr = await prompt(`Interval [${intervalDefault}]: `) || String(intervalDefault);
+  const pollIntervalStr = await input({
+    message: 'Interval (seconds)',
+    default: String(existing?.pollInterval || 300),
+    validate: (value) => {
+      const num = Number.parseInt(value, 10);
+      if (Number.isNaN(num) || num < 60) {
+        return 'Interval must be at least 60 seconds';
+      }
+      return true;
+    },
+  });
   const pollInterval = Number.parseInt(pollIntervalStr, 10);
 
   // Step 5: Sync Types
-  console.log('\nStep 5: Sync Types');
-  console.log('──────────────────');
-  console.log('Which GitHub items should be synced to Things?\n');
-  console.log('  1. pr-reviews      - PRs where you are requested as reviewer');
-  console.log('  2. prs-created     - PRs you created');
-  console.log('  3. issues-assigned - Issues assigned to you');
-  console.log('  4. issues-created  - Issues you created\n');
+  console.log(chalk.bold('\nStep 5: Sync Types'));
+  console.log(chalk.dim('──────────────────'));
+  console.log(chalk.dim('Which GitHub items should be synced to Things?\n'));
 
-  const syncTypesDefault = existing?.syncTypes?.join(', ') || 'all';
-  const syncTypesInput = await prompt(`Sync types [${syncTypesDefault}]: `) || syncTypesDefault;
-
-  let syncTypes: SyncType[];
-  if (syncTypesInput.toLowerCase() === 'all') {
-    syncTypes = [...ALL_SYNC_TYPES];
-  } else {
-    const requested = syncTypesInput.split(',').map(s => s.trim()) as SyncType[];
-    const valid = requested.filter(t => ALL_SYNC_TYPES.includes(t));
-    if (valid.length === 0) {
-      console.error('❌ No valid sync types provided. Use: pr-reviews, prs-created, issues-assigned, issues-created');
-      process.exit(1);
-    }
-    syncTypes = valid;
-  }
+  const defaultSyncTypes = existing?.syncTypes || [...ALL_SYNC_TYPES];
+  const syncTypes = await checkbox<SyncType>({
+    message: 'Select sync types',
+    choices: [
+      { name: 'PR Reviews - PRs where you are requested as reviewer', value: 'pr-reviews' as SyncType, checked: defaultSyncTypes.includes('pr-reviews') },
+      { name: 'PRs Created - PRs you created', value: 'prs-created' as SyncType, checked: defaultSyncTypes.includes('prs-created') },
+      { name: 'Issues Assigned - Issues assigned to you', value: 'issues-assigned' as SyncType, checked: defaultSyncTypes.includes('issues-assigned') },
+      { name: 'Issues Created - Issues you created', value: 'issues-created' as SyncType, checked: defaultSyncTypes.includes('issues-created') },
+    ],
+    validate: (value) => {
+      if (value.length === 0) {
+        return 'Select at least one sync type';
+      }
+      return true;
+    },
+  });
 
   // Step 6: Auto-start
-  console.log('\nStep 6: Auto-start');
-  console.log('──────────────────');
-  console.log('Start automatically when you log in to your Mac?\n');
+  console.log(chalk.bold('\nStep 6: Auto-start'));
+  console.log(chalk.dim('──────────────────'));
+  console.log(chalk.dim('Start automatically when you log in to your Mac?\n'));
 
-  const autoStartDefault = existing?.autoStart !== false;
-  const autoStartPrompt = autoStartDefault ? 'Enable auto-start? [Y/n]: ' : 'Enable auto-start? [y/N]: ';
-  const autoStartStr = await prompt(autoStartPrompt);
-  const autoStart = autoStartStr === ''
-    ? autoStartDefault
-    : autoStartStr.toLowerCase() !== 'n';
+  const autoStart = await confirm({
+    message: 'Enable auto-start?',
+    default: existing?.autoStart !== false,
+  });
 
   // Save config
   const config: Config = {
@@ -152,15 +166,15 @@ export async function initCommand(): Promise<void> {
 
   saveConfig(config);
 
-  console.log(`\n✅ Configuration saved to ${getConfigPath()}`);
+  console.log(chalk.green(`\n✅ Configuration saved to ${getConfigPath()}`));
 
   // Install LaunchAgent if requested
   if (autoStart) {
     installLaunchAgent();
-    console.log('✅ LaunchAgent installed (auto-start enabled)');
+    console.log(chalk.green('✅ LaunchAgent installed (auto-start enabled)'));
   }
 
-  console.log('\n🎉 Setup complete! Run `github-things-sync start` to begin syncing.\n');
-  console.log(`📁 Data directory: ${getDataDir()}`);
-  console.log('📋 Make sure the project "' + thingsProject + '" exists in Things 3\n');
+  console.log(chalk.green('\n🎉 Setup complete!') + ' Run `github-things-sync start` to begin syncing.\n');
+  console.log(chalk.dim('📁 Data directory: ') + getDataDir());
+  console.log(chalk.dim('📋 Make sure the project "') + chalk.cyan(thingsProject) + chalk.dim('" exists in Things 3\n'));
 }
