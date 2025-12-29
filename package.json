@@ -1,16 +1,22 @@
 {
   "name": "github-things-sync",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Sync GitHub PRs and Issues to Things 3 on macOS",
   "type": "module",
+  "main": "./dist/index.js",
   "bin": {
     "github-things-sync": "./dist/index.js"
   },
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsx src/cli/index.ts",
     "lint": "eslint src/",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm build"
   },
   "keywords": [
     "github",
@@ -19,7 +25,12 @@
     "macos",
     "productivity",
     "todo",
-    "sync"
+    "sync",
+    "cli",
+    "task-management",
+    "pull-requests",
+    "issues",
+    "automation"
   ],
   "author": "yungweng",
   "license": "MIT",
