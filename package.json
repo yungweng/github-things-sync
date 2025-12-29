@@ -25,7 +25,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/moto-nrw/github-things-sync.git"
+    "url": "git+https://github.com/yungweng/github-things-sync.git"
+  },
+  "homepage": "https://github.com/yungweng/github-things-sync#readme",
+  "bugs": {
+    "url": "https://github.com/yungweng/github-things-sync/issues"
   },
   "engines": {
     "node": ">=18.0.0"
