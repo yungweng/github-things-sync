@@ -1,0 +1,61 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+macOS CLI tool that syncs GitHub PRs and Issues to Things 3 task manager. Uses polling to fetch GitHub items via Octokit, creates/completes tasks in Things via AppleScript and URL Scheme.
+
+## Commands
+
+```bash
+# Build (compiles src/ to dist/)
+npm run build
+
+# Dev mode (run TypeScript directly via tsx)
+npm run dev -- <command>
+npm run dev -- sync -v
+npm run dev -- config --verify
+
+# Type checking
+npm run typecheck
+
+# Lint (requires ESLint config - currently missing)
+npm run lint
+
+# Install globally after build
+npm install -g .
+```
+
+## Architecture
+
+```
+src/
+├── cli/           # Commander.js entry point + command handlers
+│   └── commands/  # init, start, stop, status, sync, config
+├── daemon/        # Background sync loop, LaunchAgent setup
+├── github/        # Octokit client for GitHub API queries
+├── things/        # AppleScript (create tasks) + URL Scheme (updates)
+├── state/         # JSON persistence for config and task mappings
+└── types/         # TypeScript type definitions
+```
+
+**Data flow**: Daemon polls GitHub → checks state for existing mappings → creates new tasks via AppleScript (returns task ID) → updates via URL Scheme → saves mappings to state.
+
+**State files**: `~/.github-things-sync/` contains config.json, state.json, daemon.log, daemon.pid.
+
+## Key Patterns
+
+- **ES modules** with NodeNext resolution (`"type": "module"`)
+- **Strict TypeScript** - all strict checks enabled
+- **AppleScript for creation** (reliable task ID retrieval), **URL Scheme for updates** (setting Today, completion)
+- **LaunchAgent** for macOS autostart (`~/Library/LaunchAgents/com.github-things-sync.plist`)
+- **Config permissions**: restricted to 0o600 for security
+
+## GitHub Queries
+
+The daemon uses four search queries (configurable via sync-types):
+- `is:pr is:open review-requested:@me` (pr-reviews)
+- `is:pr is:open author:@me` (prs-created)
+- `is:issue is:open assignee:@me` (issues-assigned)
+- `is:issue is:open author:@me` (issues-created)
