@@ -9,22 +9,22 @@ macOS CLI tool that syncs GitHub PRs and Issues to Things 3 task manager. Uses p
 ## Commands
 
 ```bash
-# Build (compiles src/ to dist/)
-npm run build
+# Build (bundles src/ to dist/ via tsup)
+pnpm build
 
 # Dev mode (run TypeScript directly via tsx)
-npm run dev -- <command>
-npm run dev -- sync -v
-npm run dev -- config --verify
+pnpm dev -- <command>
+pnpm dev -- sync -v
+pnpm dev -- config --verify
 
 # Type checking
-npm run typecheck
+pnpm typecheck
 
-# Lint (requires ESLint config - currently missing)
-npm run lint
+# Lint
+pnpm lint
 
 # Install globally after build
-npm install -g .
+pnpm install -g .
 ```
 
 ## Architecture

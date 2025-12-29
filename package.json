@@ -4,10 +4,10 @@
   "description": "Sync GitHub PRs and Issues to Things 3 on macOS",
   "type": "module",
   "bin": {
-    "github-things-sync": "./dist/cli/index.js"
+    "github-things-sync": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsup",
     "dev": "tsx src/cli/index.ts",
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit"
@@ -42,7 +42,11 @@
   "devDependencies": {
     "@types/node": "^20.0.0",
     "eslint": "^9.0.0",
+    "tsup": "^8.5.1",
     "tsx": "^4.0.0",
     "typescript": "^5.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
   }
 }
