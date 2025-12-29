@@ -83,7 +83,8 @@ export class ThingsClient {
     });
 
     const url = `things:///update?${params.toString()}`;
-    await execAsync(`open "${url}"`);
+    // -g flag opens in background without stealing focus
+    await execAsync(`open -g "${url}"`);
   }
 
   /**
@@ -131,7 +132,8 @@ export class ThingsClient {
     });
 
     const url = `things:///update?${params.toString()}`;
-    await execAsync(`open "${url}"`);
+    // -g flag opens in background without stealing focus
+    await execAsync(`open -g "${url}"`);
     // Small delay to let Things process the update
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
@@ -153,7 +155,8 @@ export class ThingsClient {
     });
 
     const url = `things:///add?${params.toString()}`;
-    await execAsync(`open "${url}"`);
+    // -g flag opens in background without stealing focus
+    await execAsync(`open -g "${url}"`);
   }
 
   private formatTitle(item: GitHubItem): string {
