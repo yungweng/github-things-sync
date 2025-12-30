@@ -4,15 +4,18 @@
 
 import { checkbox, confirm, input, password } from "@inquirer/prompts";
 import chalk from "chalk";
+import ora from "ora";
 import { installLaunchAgent } from "../../daemon/launchagent.js";
+import { GitHubClient } from "../../github/client.js";
 import {
 	getConfigPath,
 	getDataDir,
 	loadConfig,
 	saveConfig,
 } from "../../state/config.js";
-import type { Config, SyncType } from "../../types/index.js";
+import type { Config, RepoFilter, SyncType } from "../../types/index.js";
 import { ALL_SYNC_TYPES } from "../../types/index.js";
+import { formatRepoFilter, selectRepos } from "../repo-selector.js";
 
 function maskToken(token: string): string {
 	if (token.length <= 8) return "****";
@@ -38,6 +41,9 @@ export async function initCommand(): Promise<void> {
 		console.log(
 			chalk.dim("  Sync Types:    ") +
 				(existing.syncTypes?.join(", ") || "all"),
+		);
+		console.log(
+			chalk.dim("  Repo Scope:    ") + formatRepoFilter(existing.repoFilter),
 		);
 		console.log(
 			chalk.dim("  Autostart:     ") +
@@ -197,8 +203,43 @@ export async function initCommand(): Promise<void> {
 		},
 	});
 
-	// Step 6: Auto-start
-	console.log(chalk.bold("\nStep 6: Auto-start"));
+	// Step 6: Repository Scope
+	console.log(chalk.bold("\nStep 6: Repository Scope"));
+	console.log(chalk.dim("────────────────────────"));
+	console.log(chalk.dim("Which repositories should be synced to Things?\n"));
+
+	const spinner = ora("Fetching your repositories...").start();
+	let repoFilter: RepoFilter = { mode: "all", repos: [] };
+
+	try {
+		const client = new GitHubClient(githubToken);
+		const groupedRepos = await client.fetchAllRepos();
+		spinner.stop();
+
+		const totalRepos = Object.values(groupedRepos).reduce(
+			(sum, repos) => sum + repos.length,
+			0,
+		);
+		const ownerCount = Object.keys(groupedRepos).length;
+		console.log(
+			chalk.dim(
+				`Found ${totalRepos} repositories across ${ownerCount} owner${ownerCount === 1 ? "" : "s"}.\n`,
+			),
+		);
+
+		repoFilter = await selectRepos(groupedRepos, existing?.repoFilter);
+	} catch (error) {
+		spinner.fail("Failed to fetch repositories");
+		console.log(
+			chalk.yellow(
+				"⚠️  Could not fetch repositories. Defaulting to sync all repos.",
+			),
+		);
+		console.log(chalk.dim(`   Error: ${error}\n`));
+	}
+
+	// Step 7: Auto-start
+	console.log(chalk.bold("\nStep 7: Auto-start"));
 	console.log(chalk.dim("──────────────────"));
 	console.log(chalk.dim("Start automatically when you log in to your Mac?\n"));
 
@@ -215,6 +256,7 @@ export async function initCommand(): Promise<void> {
 		pollInterval,
 		autoStart,
 		syncTypes,
+		repoFilter,
 	};
 
 	saveConfig(config);

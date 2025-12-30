@@ -32,7 +32,11 @@ export async function runSync(
 		errors: [],
 	};
 
-	const github = new GitHubClient(config.githubToken, config.syncTypes);
+	const github = new GitHubClient(
+		config.githubToken,
+		config.syncTypes,
+		config.repoFilter,
+	);
 	const things = new ThingsClient(config.thingsProject, config.thingsAuthToken);
 
 	try {

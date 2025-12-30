@@ -55,6 +55,12 @@ export interface SyncState {
 	lastError: string | null;
 }
 
+// Repository filter configuration
+export interface RepoFilter {
+	mode: "all" | "selected";
+	repos: string[]; // Format: "owner/repo"
+}
+
 // User configuration
 export interface Config {
 	githubToken: string;
@@ -63,6 +69,7 @@ export interface Config {
 	pollInterval: number; // Seconds, default: 300 (5 min)
 	autoStart: boolean; // Install LaunchAgent
 	syncTypes: SyncType[]; // Which item types to sync (default: all)
+	repoFilter?: RepoFilter; // Which repos to sync (undefined = all)
 }
 
 // Daemon status

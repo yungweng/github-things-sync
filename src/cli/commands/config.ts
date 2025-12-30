@@ -5,13 +5,16 @@
 import { password } from "@inquirer/prompts";
 import { Octokit } from "@octokit/rest";
 import chalk from "chalk";
+import ora from "ora";
 import {
 	installLaunchAgent,
 	uninstallLaunchAgent,
 } from "../../daemon/launchagent.js";
+import { GitHubClient } from "../../github/client.js";
 import { loadConfig, saveConfig } from "../../state/config.js";
 import type { Config, SyncType } from "../../types/index.js";
 import { ALL_SYNC_TYPES } from "../../types/index.js";
+import { formatRepoFilter, selectRepos } from "../repo-selector.js";
 
 interface ConfigOptions {
 	interval?: string;
@@ -20,6 +23,7 @@ interface ConfigOptions {
 	githubToken?: string;
 	thingsToken?: string;
 	syncTypes?: string;
+	repos?: string;
 	verify?: boolean;
 	show?: boolean;
 }
@@ -141,6 +145,49 @@ export async function configCommand(options: ConfigOptions): Promise<void> {
 		changed = true;
 	}
 
+	if (options.repos !== undefined) {
+		if (options.repos.toLowerCase() === "all") {
+			config.repoFilter = { mode: "all", repos: [] };
+			console.log(chalk.green("✅ Repository scope set to: all repositories"));
+			changed = true;
+		} else if (options.repos === "prompt") {
+			const spinner = ora("Fetching your repositories...").start();
+			try {
+				const client = new GitHubClient(config.githubToken);
+				const groupedRepos = await client.fetchAllRepos();
+				spinner.stop();
+
+				const totalRepos = Object.values(groupedRepos).reduce(
+					(sum, repos) => sum + repos.length,
+					0,
+				);
+				const ownerCount = Object.keys(groupedRepos).length;
+				console.log(
+					chalk.dim(
+						`Found ${totalRepos} repositories across ${ownerCount} owner${ownerCount === 1 ? "" : "s"}.\n`,
+					),
+				);
+
+				config.repoFilter = await selectRepos(groupedRepos, config.repoFilter);
+				console.log(
+					chalk.green(
+						`✅ Repository scope set to: ${formatRepoFilter(config.repoFilter)}`,
+					),
+				);
+				changed = true;
+			} catch (error) {
+				spinner.fail("Failed to fetch repositories");
+				console.error(chalk.red(`❌ ${error}`));
+				process.exit(1);
+			}
+		} else {
+			console.error(
+				chalk.red("❌ Use --repos=all or --repos=prompt to configure repos"),
+			);
+			process.exit(1);
+		}
+	}
+
 	if (changed) {
 		saveConfig(config);
 		console.log(
@@ -168,6 +215,9 @@ async function showConfig(config: Config): Promise<void> {
 		chalk.dim("Sync types:    ") +
 			(config.syncTypes?.join(", ") || "all (default)"),
 	);
+	console.log(
+		chalk.dim("Repo scope:    ") + formatRepoFilter(config.repoFilter),
+	);
 	console.log("");
 	console.log(chalk.bold("Tokens"));
 	console.log(chalk.dim("──────"));
@@ -190,6 +240,9 @@ async function showConfig(config: Config): Promise<void> {
 	console.log(
 		chalk.dim("  --sync-types=TYPES    ") +
 			'Set sync types (comma-separated or "all")',
+	);
+	console.log(
+		`${chalk.dim("  --repos=all|prompt    ")}Set repo filter (all or select)`,
 	);
 	console.log(`${chalk.dim("  --verify              ")}Verify tokens work`);
 	console.log("");
