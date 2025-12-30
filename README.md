@@ -33,6 +33,7 @@ github-things-sync start
 - 🔄 **Auto-sync** — PRs and issues appear in Things automatically
 - ✅ **Completion tracking** — Close an issue, task completes in Things
 - 📋 **Smart filtering** — Choose what to sync (reviews, created, assigned)
+- 🎯 **Repository scope** — Select specific repos or orgs to sync
 - 🚀 **Background daemon** — Runs silently, syncs every 5 minutes
 - 🍎 **macOS native** — Uses LaunchAgent for autostart
 
@@ -125,6 +126,8 @@ Update settings with:
 github-things-sync config --interval=600      # Poll every 10 minutes
 github-things-sync config --project="Work"    # Use different Things project
 github-things-sync config --sync-types=pr-reviews,issues-assigned
+github-things-sync config --repos=prompt      # Select specific repos to sync
+github-things-sync config --repos=all         # Reset to sync all repos
 ```
 
 ## Development
@@ -133,7 +136,7 @@ github-things-sync config --sync-types=pr-reviews,issues-assigned
 git clone https://github.com/yungweng/github-things-sync.git
 cd github-things-sync
 pnpm install
-pnpm dev -- sync -v  # Run sync in dev mode
+pnpm dev sync -v  # Run sync in dev mode
 ```
 
 ## Contributing

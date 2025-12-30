@@ -37,8 +37,19 @@ export async function configCommand(options: ConfigOptions): Promise<void> {
 		process.exit(1);
 	}
 
-	// Show current config
-	if (options.show || Object.keys(options).length === 0) {
+	// Check if any update option was provided
+	const hasUpdateOption =
+		options.interval !== undefined ||
+		options.autostart !== undefined ||
+		options.project !== undefined ||
+		options.githubToken !== undefined ||
+		options.thingsToken !== undefined ||
+		options.syncTypes !== undefined ||
+		options.repos !== undefined ||
+		options.verify;
+
+	// Show current config if no update options provided
+	if (options.show || !hasUpdateOption) {
 		await showConfig(config);
 		return;
 	}
