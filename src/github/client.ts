@@ -3,14 +3,31 @@
  */
 
 import { Octokit } from "@octokit/rest";
-import type { GitHubItem, GitHubItemType, SyncType } from "../types/index.js";
+import type {
+	GitHubItem,
+	GitHubItemType,
+	RepoFilter,
+	SyncType,
+} from "../types/index.js";
+
+export interface RepoInfo {
+	fullName: string; // "owner/repo"
+	name: string;
+	owner: string;
+	isPrivate: boolean;
+}
+
+export interface GroupedRepos {
+	[owner: string]: RepoInfo[];
+}
 
 export class GitHubClient {
 	private octokit: Octokit;
 	private username: string | null = null;
 	private syncTypes: SyncType[];
+	private repoFilter?: RepoFilter;
 
-	constructor(token: string, syncTypes?: SyncType[]) {
+	constructor(token: string, syncTypes?: SyncType[], repoFilter?: RepoFilter) {
 		this.octokit = new Octokit({ auth: token });
 		this.syncTypes = syncTypes || [
 			"pr-reviews",
@@ -18,6 +35,7 @@ export class GitHubClient {
 			"issues-assigned",
 			"issues-created",
 		];
+		this.repoFilter = repoFilter;
 	}
 
 	async getUsername(): Promise<string> {
@@ -26,6 +44,62 @@ export class GitHubClient {
 		const { data } = await this.octokit.users.getAuthenticated();
 		this.username = data.login;
 		return this.username;
+	}
+
+	/**
+	 * Fetch all repositories the user has access to, grouped by owner
+	 */
+	async fetchAllRepos(): Promise<GroupedRepos> {
+		const repos: RepoInfo[] = [];
+		let page = 1;
+
+		// Paginate through all repos
+		while (true) {
+			const { data } = await this.octokit.repos.listForAuthenticatedUser({
+				per_page: 100,
+				page,
+				sort: "full_name",
+			});
+
+			if (data.length === 0) break;
+
+			for (const repo of data) {
+				repos.push({
+					fullName: repo.full_name,
+					name: repo.name,
+					owner: repo.owner?.login || "unknown",
+					isPrivate: repo.private,
+				});
+			}
+
+			page++;
+		}
+
+		// Group by owner
+		const grouped: GroupedRepos = {};
+		for (const repo of repos) {
+			if (!grouped[repo.owner]) {
+				grouped[repo.owner] = [];
+			}
+			grouped[repo.owner].push(repo);
+		}
+
+		// Sort repos within each owner
+		for (const owner of Object.keys(grouped)) {
+			grouped[owner].sort((a, b) => a.name.localeCompare(b.name));
+		}
+
+		return grouped;
+	}
+
+	/**
+	 * Check if a repo should be included based on filter
+	 */
+	private shouldIncludeRepo(repoFullName: string): boolean {
+		if (!this.repoFilter || this.repoFilter.mode === "all") {
+			return true;
+		}
+		return this.repoFilter.repos.includes(repoFullName);
 	}
 
 	/**
@@ -57,7 +131,8 @@ export class GitHubClient {
 			items.push(...result);
 		}
 
-		return items;
+		// Filter by repo if configured
+		return items.filter((item) => this.shouldIncludeRepo(item.repo));
 	}
 
 	/**

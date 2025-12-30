@@ -124,6 +124,10 @@ program
 		'Update Things token (use "prompt" for interactive)',
 	)
 	.option("--sync-types <types>", 'Set sync types (comma-separated or "all")')
+	.option(
+		"--repos <mode>",
+		'Set repo filter ("all" or "prompt" for interactive)',
+	)
 	.option("--verify", "Verify tokens work")
 	.action(configCommand);
 

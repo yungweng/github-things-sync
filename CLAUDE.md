@@ -13,9 +13,10 @@ macOS CLI tool that syncs GitHub PRs and Issues to Things 3 task manager. Uses p
 pnpm build
 
 # Dev mode (run TypeScript directly via tsx)
-pnpm dev -- <command>
-pnpm dev -- sync -v
-pnpm dev -- config --verify
+pnpm dev <command>
+pnpm dev sync -v
+pnpm dev config --verify
+pnpm dev config --repos=prompt
 
 # Type checking
 pnpm typecheck
@@ -62,6 +63,8 @@ The daemon uses four search queries (configurable via sync-types):
 - `is:pr is:open author:@me` (prs-created)
 - `is:issue is:open assignee:@me` (issues-assigned)
 - `is:issue is:open author:@me` (issues-created)
+
+Results are filtered by repository scope (configurable via `--repos=prompt` or in init wizard).
 
 ## Publishing
 
