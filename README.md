@@ -11,6 +11,10 @@
 
 Stop manually creating todos for your GitHub work. github-things-sync watches your assigned issues, PR reviews, and created items—automatically creating and completing tasks in Things 3.
 
+<p align="center">
+  <img src="assets/demo.gif" alt="Demo" width="700">
+</p>
+
 ## Quick Start
 
 ```bash
