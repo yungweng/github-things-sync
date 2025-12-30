@@ -36,10 +36,16 @@ export async function startCommand(): Promise<void> {
 		}
 	}
 
-	// Find the daemon script path (.ts for dev, .js for production)
+	// Find the daemon script path
+	// In dev mode: src/daemon/index.ts exists, use tsx
+	// In production: dist/daemon/index.js exists (separate tsup entry point), use node
 	const scriptDir = path.dirname(new URL(import.meta.url).pathname);
+
+	// Check for dev mode first (src/daemon/index.ts relative to src/cli/commands/)
 	const tsScript = path.join(scriptDir, "../../daemon/index.ts");
-	const jsScript = path.join(scriptDir, "../../daemon/index.js");
+
+	// For production, daemon/index.js is relative to cli/index.js in dist/
+	const jsScript = path.join(scriptDir, "../daemon/index.js");
 
 	// Use tsx for .ts files, node for compiled .js
 	const useTs = fs.existsSync(tsScript);
