@@ -59,3 +59,18 @@ The daemon uses four search queries (configurable via sync-types):
 - `is:pr is:open author:@me` (prs-created)
 - `is:issue is:open assignee:@me` (issues-assigned)
 - `is:issue is:open author:@me` (issues-created)
+
+## Publishing
+
+```bash
+# 1. Bump version
+npm version patch  # or minor/major
+
+# 2. Commit and push
+git push origin main --tags
+
+# 3. Create release (triggers CD pipeline)
+gh release create vX.Y.Z --generate-notes
+```
+
+Publishing is automated via GitHub Actions with OIDC trusted publishing (no npm tokens).
