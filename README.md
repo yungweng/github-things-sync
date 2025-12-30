@@ -50,7 +50,7 @@ github-things-sync start
 
 - macOS (Things 3 is macOS/iOS only)
 - [Things 3](https://culturedcode.com/things/) installed
-- Node.js 18+
+- Node.js 20+
 - [GitHub Personal Access Token](https://github.com/settings/tokens) (classic, `repo` scope)
 
 ## Installation
