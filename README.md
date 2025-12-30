@@ -2,6 +2,7 @@
 
 <p align="center">
   <a href="https://www.npmjs.com/package/github-things-sync"><img src="https://img.shields.io/npm/v/github-things-sync.svg" alt="npm version"></a>
+  <a href="https://www.npmjs.com/package/github-things-sync"><img src="https://img.shields.io/npm/dm/github-things-sync.svg" alt="downloads"></a>
   <a href="https://github.com/yungweng/github-things-sync/blob/main/LICENSE"><img src="https://img.shields.io/npm/l/github-things-sync.svg" alt="license"></a>
   <img src="https://img.shields.io/node/v/github-things-sync.svg" alt="node version">
 </p>
@@ -130,6 +131,12 @@ cd github-things-sync
 pnpm install
 pnpm dev -- sync -v  # Run sync in dev mode
 ```
+
+## Contributing
+
+Found a bug or have a feature request? [Open an issue](https://github.com/yungweng/github-things-sync/issues).
+
+Pull requests are welcome!
 
 ## License
 
