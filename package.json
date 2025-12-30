@@ -14,7 +14,9 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsx src/cli/index.ts",
-    "lint": "eslint src/",
+    "lint": "biome check src",
+    "lint:fix": "biome check --write src",
+    "format": "biome format --write src",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "pnpm build"
   },
@@ -55,8 +57,8 @@
     "update-notifier": "^7.3.1"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.3.10",
     "@types/node": "^20.0.0",
-    "eslint": "^9.0.0",
     "tsup": "^8.5.1",
     "tsx": "^4.0.0",
     "typescript": "^5.0.0"
