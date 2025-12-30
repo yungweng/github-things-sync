@@ -20,11 +20,13 @@ pnpm dev -- config --verify
 # Type checking
 pnpm typecheck
 
-# Lint
-pnpm lint
+# Lint and format (Biome)
+pnpm lint           # Check only
+pnpm lint:fix       # Auto-fix lint issues
+pnpm format         # Format files
 
 # Install globally after build
-pnpm install -g .
+pnpm link --global
 ```
 
 ## Architecture
@@ -48,6 +50,7 @@ src/
 
 - **ES modules** with NodeNext resolution (`"type": "module"`)
 - **Strict TypeScript** - all strict checks enabled
+- **Biome** for linting/formatting (tabs, double quotes)
 - **AppleScript for creation** (reliable task ID retrieval), **URL Scheme for updates** (setting Today, completion)
 - **LaunchAgent** for macOS autostart (`~/Library/LaunchAgents/com.github-things-sync.plist`)
 - **Config permissions**: restricted to 0o600 for security
