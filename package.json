@@ -42,6 +42,7 @@
   "bugs": {
     "url": "https://github.com/yungweng/github-things-sync/issues"
   },
+  "packageManager": "pnpm@10.26.2",
   "engines": {
     "node": ">=18.0.0"
   },
