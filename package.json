@@ -9,6 +9,7 @@
   },
   "files": [
     "dist",
+    "scripts",
     "README.md"
   ],
   "scripts": {
@@ -18,7 +19,8 @@
     "lint:fix": "biome check --write src",
     "format": "biome format --write src",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "pnpm build"
+    "prepublishOnly": "pnpm build",
+    "postinstall": "node scripts/postinstall.js || true"
   },
   "keywords": [
     "github",
