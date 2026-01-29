@@ -115,6 +115,7 @@ program
 	.option("--interval <seconds>", "Set poll interval (min: 60)")
 	.option("--autostart <bool>", "Enable/disable autostart (true/false)")
 	.option("--project <name>", "Set Things project name")
+	.option("--area <name>", "Set Things area for the project")
 	.option(
 		"--github-token <token>",
 		'Update GitHub token (use "prompt" for interactive)',

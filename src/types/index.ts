@@ -65,6 +65,7 @@ export interface RepoFilter {
 export interface Config {
 	githubToken: string;
 	thingsProject: string; // Default: "GitHub"
+	thingsArea?: string; // Things 3 area to place the project in
 	thingsAuthToken: string; // Required for updating tasks
 	pollInterval: number; // Seconds, default: 300 (5 min)
 	autoStart: boolean; // Install LaunchAgent

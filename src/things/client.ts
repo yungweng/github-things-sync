@@ -10,12 +10,14 @@ const execAsync = promisify(exec);
 
 export class ThingsClient {
 	private project: string;
+	private area?: string;
 	private authToken: string;
 	private projectVerified: boolean = false;
 
-	constructor(project: string, authToken: string) {
+	constructor(project: string, authToken: string, area?: string) {
 		this.project = project;
 		this.authToken = authToken;
+		this.area = area;
 	}
 
 	/**
@@ -24,13 +26,21 @@ export class ThingsClient {
 	async ensureProjectExists(): Promise<void> {
 		if (this.projectVerified) return;
 
+		const areaAssignment = this.area
+			? `
+          try
+            set a to area "${this.area}"
+            set area of proj to a
+          end try`
+			: "";
+
 		const script = `
       tell application "Things3"
         try
           set proj to project "${this.project}"
           return "exists"
         on error
-          make new project with properties {name:"${this.project}"}
+          set proj to make new project with properties {name:"${this.project}"}${areaAssignment}
           return "created"
         end try
       end tell
@@ -90,7 +100,7 @@ export class ThingsClient {
 	}
 
 	/**
-	 * Create task via AppleScript (more reliable for getting ID)
+	 * Create task via AppleScript and schedule for Today
 	 */
 	private async createTaskViaAppleScript(
 		title: string,
@@ -98,8 +108,8 @@ export class ThingsClient {
 		tags: string,
 	): Promise<string> {
 		// Escape special characters for AppleScript
-		const escapedTitle = title.replace(/"/g, '\\"').replace(/\\/g, "\\\\");
-		const escapedNotes = notes.replace(/"/g, '\\"').replace(/\\/g, "\\\\");
+		const escapedTitle = title.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+		const escapedNotes = notes.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 		const escapedProject = this.project.replace(/"/g, '\\"');
 
 		// Create task directly in the project using "at beginning of"
@@ -107,6 +117,7 @@ export class ThingsClient {
       tell application "Things3"
         set proj to project "${escapedProject}"
         set newToDo to make new to do with properties {name:"${escapedTitle}", notes:"${escapedNotes}", tag names:"${tags}"} at beginning of proj
+        schedule newToDo for current date
         return id of newToDo
       end tell
     `;
@@ -119,27 +130,7 @@ export class ThingsClient {
 		const match = rawId.match(/to do id (.+)/);
 		const thingsId = match ? match[1] : rawId;
 
-		// Set "when=today" via URL scheme (AppleScript can't do this reliably)
-		await this.setTaskToToday(thingsId);
-
 		return thingsId;
-	}
-
-	/**
-	 * Set a task to appear in Today using URL scheme
-	 */
-	private async setTaskToToday(thingsId: string): Promise<void> {
-		const params = new URLSearchParams({
-			id: thingsId,
-			"auth-token": this.authToken,
-			when: "today",
-		});
-
-		const url = `things:///update?${params.toString().replace(/\+/g, "%20")}`;
-		// -g flag opens in background without stealing focus
-		await execAsync(`open -g "${url}"`);
-		// Small delay to let Things process the update
-		await new Promise((resolve) => setTimeout(resolve, 100));
 	}
 
 	/**

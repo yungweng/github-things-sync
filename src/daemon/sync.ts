@@ -37,7 +37,11 @@ export async function runSync(
 		config.syncTypes,
 		config.repoFilter,
 	);
-	const things = new ThingsClient(config.thingsProject, config.thingsAuthToken);
+	const things = new ThingsClient(
+		config.thingsProject,
+		config.thingsAuthToken,
+		config.thingsArea,
+	);
 
 	try {
 		// Step 1: Fetch all open items from GitHub

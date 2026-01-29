@@ -20,6 +20,7 @@ interface ConfigOptions {
 	interval?: string;
 	autostart?: string;
 	project?: string;
+	area?: string;
 	githubToken?: string;
 	thingsToken?: string;
 	syncTypes?: string;
@@ -42,6 +43,7 @@ export async function configCommand(options: ConfigOptions): Promise<void> {
 		options.interval !== undefined ||
 		options.autostart !== undefined ||
 		options.project !== undefined ||
+		options.area !== undefined ||
 		options.githubToken !== undefined ||
 		options.thingsToken !== undefined ||
 		options.syncTypes !== undefined ||
@@ -99,6 +101,16 @@ export async function configCommand(options: ConfigOptions): Promise<void> {
 	if (options.project !== undefined) {
 		config.thingsProject = options.project;
 		console.log(chalk.green(`✅ Things project set to "${options.project}"`));
+		changed = true;
+	}
+
+	if (options.area !== undefined) {
+		config.thingsArea = options.area || undefined;
+		console.log(
+			options.area
+				? chalk.green(`✅ Things area set to "${options.area}"`)
+				: chalk.green("✅ Things area cleared"),
+		);
 		changed = true;
 	}
 
@@ -214,6 +226,7 @@ async function showConfig(config: Config): Promise<void> {
 	console.log(chalk.bold("Settings"));
 	console.log(chalk.dim("────────"));
 	console.log(chalk.dim("Project:       ") + config.thingsProject);
+	console.log(chalk.dim("Area:          ") + (config.thingsArea || "(none)"));
 	console.log(
 		chalk.dim("Poll interval: ") +
 			`${config.pollInterval}s (${config.pollInterval / 60} min)`,
@@ -245,6 +258,9 @@ async function showConfig(config: Config): Promise<void> {
 	);
 	console.log(
 		`${chalk.dim("  --project=NAME        ")}Set Things project name`,
+	);
+	console.log(
+		`${chalk.dim("  --area=NAME           ")}Set Things area for the project`,
 	);
 	console.log(`${chalk.dim("  --github-token=prompt ")}Update GitHub token`);
 	console.log(`${chalk.dim("  --things-token=prompt ")}Update Things token`);

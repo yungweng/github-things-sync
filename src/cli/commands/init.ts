@@ -37,6 +37,9 @@ export async function initCommand(): Promise<void> {
 			chalk.dim("  Things Token:  ") + maskToken(existing.thingsAuthToken),
 		);
 		console.log(chalk.dim("  Project:       ") + existing.thingsProject);
+		console.log(
+			chalk.dim("  Area:          ") + (existing.thingsArea || "(none)"),
+		);
 		console.log(`${chalk.dim("  Poll Interval: ") + existing.pollInterval}s`);
 		console.log(
 			chalk.dim("  Sync Types:    ") +
@@ -145,6 +148,18 @@ export async function initCommand(): Promise<void> {
 		},
 	});
 
+	console.log(
+		chalk.dim(
+			"\nOptional: assign the project to a Things area so tasks appear in Today.\n",
+		),
+	);
+
+	const thingsArea =
+		(await input({
+			message: "Area name (leave empty to skip)",
+			default: existing?.thingsArea || "",
+		})) || undefined;
+
 	// Step 4: Poll Interval
 	console.log(chalk.bold("\nStep 4: Poll Interval"));
 	console.log(chalk.dim("─────────────────────"));
@@ -252,6 +267,7 @@ export async function initCommand(): Promise<void> {
 	const config: Config = {
 		githubToken,
 		thingsProject,
+		thingsArea,
 		thingsAuthToken,
 		pollInterval,
 		autoStart,
