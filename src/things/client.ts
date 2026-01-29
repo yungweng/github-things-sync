@@ -84,7 +84,7 @@ export class ThingsClient {
 			completed: "true",
 		});
 
-		const url = `things:///update?${params.toString()}`;
+		const url = `things:///update?${params.toString().replace(/\+/g, "%20")}`;
 		// -g flag opens in background without stealing focus
 		await execAsync(`open -g "${url}"`);
 	}
@@ -135,7 +135,7 @@ export class ThingsClient {
 			when: "today",
 		});
 
-		const url = `things:///update?${params.toString()}`;
+		const url = `things:///update?${params.toString().replace(/\+/g, "%20")}`;
 		// -g flag opens in background without stealing focus
 		await execAsync(`open -g "${url}"`);
 		// Small delay to let Things process the update
@@ -158,7 +158,7 @@ export class ThingsClient {
 			list: this.project,
 		});
 
-		const url = `things:///add?${params.toString()}`;
+		const url = `things:///add?${params.toString().replace(/\+/g, "%20")}`;
 		// -g flag opens in background without stealing focus
 		await execAsync(`open -g "${url}"`);
 	}
