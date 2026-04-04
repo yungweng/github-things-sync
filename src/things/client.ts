@@ -1,157 +1,141 @@
 /**
- * Things 3 client using URL Scheme
+ * Things 3 client using AppleScript (create/complete) and URL Scheme (fallback updates)
+ *
+ * Modeled after shared-things' proven approach:
+ * - AppleScript for creation (returns real Things ID atomically)
+ * - AppleScript for completion (reliable with real IDs)
+ * - No URL scheme fallback for creation (fake IDs break updates)
+ *
+ * Uses project IDs instead of names because Things' AppleScript `project "Name"`
+ * lookup is broken for projects created via URL scheme — only `project id "X"` works.
  */
 
-import { exec } from "node:child_process";
-import { promisify } from "node:util";
+import { execSync } from "node:child_process";
 import type { GitHubItem, GitHubItemType } from "../types/index.js";
 
-const execAsync = promisify(exec);
+function runAppleScript(script: string): string {
+	const result = execSync(`osascript -e '${script.replace(/'/g, "'\"'\"'")}'`, {
+		encoding: "utf-8",
+		maxBuffer: 10 * 1024 * 1024,
+	}).trim();
+	return result;
+}
 
 export class ThingsClient {
-	private project: string;
+	private projectName: string;
 	private area?: string;
-	private authToken: string;
-	private projectVerified: boolean = false;
+	private projectId: string | null = null;
 
-	constructor(project: string, authToken: string, area?: string) {
-		this.project = project;
-		this.authToken = authToken;
+	constructor(project: string, _authToken: string, area?: string) {
+		this.projectName = project;
 		this.area = area;
 	}
 
 	/**
-	 * Ensure the project exists in Things, create if not
+	 * Resolve the project ID. Things' `project "Name"` is broken for URL-scheme-created
+	 * projects, so we find the project by scanning todo references or create a new one.
+	 * Stores the ID for reuse.
 	 */
-	async ensureProjectExists(): Promise<void> {
-		if (this.projectVerified) return;
+	async ensureProjectExists(): Promise<string> {
+		if (this.projectId) return this.projectId;
 
-		const areaAssignment = this.area
-			? `
-          try
-            set a to area "${this.area}"
-            set area of proj to a
-          end try`
-			: "";
-
-		const script = `
+		// Strategy 1: Find existing project by scanning todos for a matching project reference
+		const escapedName = this.projectName.replace(/"/g, '\\"');
+		const findScript = `
       tell application "Things3"
-        try
-          set proj to project "${this.project}"
-          return "exists"
-        on error
-          set proj to make new project with properties {name:"${this.project}"}${areaAssignment}
-          return "created"
-        end try
+        set foundId to ""
+        repeat with l in {"Heute", "Jederzeit", "Geplant", "Irgendwann", "Eingang"}
+          repeat with t in to dos of list l
+            try
+              set projRef to project of t
+              if projRef is not missing value then
+                if name of projRef is "${escapedName}" then
+                  return id of projRef
+                end if
+              end if
+            end try
+          end repeat
+        end repeat
+        return "NOT_FOUND"
       end tell
     `;
 
 		try {
-			const { stdout } = await execAsync(
-				`osascript -e '${script.replace(/'/g, "'\"'\"'")}'`,
-			);
-			const result = stdout.trim();
-			if (result === "created") {
-				console.log(`📁 Created Things project: ${this.project}`);
+			const result = runAppleScript(findScript);
+			if (result !== "NOT_FOUND") {
+				this.projectId = result;
+				return this.projectId;
 			}
-			this.projectVerified = true;
-		} catch (error) {
-			console.warn(`Warning: Could not verify/create project: ${error}`);
+		} catch {
+			// Fall through to creation
 		}
+
+		// Strategy 2: Create new project (use variable reference, not name lookup)
+		const areaAssignment = this.area
+			? `set area of newProj to area "${this.area.replace(/"/g, '\\"')}"`
+			: "";
+
+		const createScript = `
+      tell application "Things3"
+        set newProj to make new project with properties {name:"${escapedName}"}
+        ${areaAssignment}
+        return id of newProj
+      end tell
+    `;
+
+		this.projectId = runAppleScript(createScript);
+		console.log(`📁 Created Things project: ${this.projectName}`);
+		return this.projectId;
 	}
 
 	/**
-	 * Create a task in Things for a GitHub item
-	 * Returns the Things task ID
+	 * Create a task in Things for a GitHub item.
+	 * Uses AppleScript exclusively — returns the real Things task ID.
+	 * Throws on failure (no fake IDs).
 	 */
 	async createTask(item: GitHubItem): Promise<string> {
-		// Ensure project exists before creating task
-		await this.ensureProjectExists();
+		const projId = await this.ensureProjectExists();
 
 		const title = this.formatTitle(item);
 		const notes = this.formatNotes(item);
 		const tags = this.formatTags(item);
 
-		// Try AppleScript first (gives us the ID back)
-		try {
-			const thingsId = await this.createTaskViaAppleScript(title, notes, tags);
-			return thingsId;
-		} catch (_error) {
-			// Fallback: use URL scheme (more reliable but no ID)
-			console.warn("AppleScript failed, falling back to URL scheme");
-			await this.createTaskViaUrlScheme(title, notes, tags);
-			return `url-${Date.now()}`;
-		}
-	}
-
-	/**
-	 * Complete a task in Things
-	 */
-	async completeTask(thingsId: string): Promise<void> {
-		const params = new URLSearchParams({
-			id: thingsId,
-			"auth-token": this.authToken,
-			completed: "true",
-		});
-
-		const url = `things:///update?${params.toString().replace(/\+/g, "%20")}`;
-		// -g flag opens in background without stealing focus
-		await execAsync(`open -g "${url}"`);
-	}
-
-	/**
-	 * Create task via AppleScript and schedule for Today
-	 */
-	private async createTaskViaAppleScript(
-		title: string,
-		notes: string,
-		tags: string,
-	): Promise<string> {
-		// Escape special characters for AppleScript
 		const escapedTitle = title.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 		const escapedNotes = notes.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-		const escapedProject = this.project.replace(/"/g, '\\"');
 
-		// Create task directly in the project using "at beginning of"
 		const script = `
       tell application "Things3"
-        set proj to project "${escapedProject}"
+        set proj to project id "${projId}"
         set newToDo to make new to do with properties {name:"${escapedTitle}", notes:"${escapedNotes}", tag names:"${tags}"} at beginning of proj
         schedule newToDo for current date
         return id of newToDo
       end tell
     `;
 
-		const { stdout } = await execAsync(
-			`osascript -e '${script.replace(/'/g, "'\"'\"'")}'`,
-		);
-		const rawId = stdout.trim();
-		// AppleScript returns "to do id XYZ", extract just the ID
-		const match = rawId.match(/to do id (.+)/);
-		const thingsId = match ? match[1] : rawId;
-
-		return thingsId;
+		return runAppleScript(script);
 	}
 
 	/**
-	 * Fallback: create via URL scheme
+	 * Complete a task in Things via AppleScript.
+	 * Uses the real Things ID to set status to completed.
 	 */
-	private async createTaskViaUrlScheme(
-		title: string,
-		notes: string,
-		tags: string,
-	): Promise<void> {
-		const params = new URLSearchParams({
-			title,
-			notes,
-			tags,
-			when: "today",
-			list: this.project,
-		});
+	async completeTask(thingsId: string): Promise<void> {
+		if (thingsId.startsWith("url-")) {
+			throw new Error(
+				`Cannot complete task with fake ID "${thingsId}". Run "github-things-sync repair" to fix broken mappings.`,
+			);
+		}
 
-		const url = `things:///add?${params.toString().replace(/\+/g, "%20")}`;
-		// -g flag opens in background without stealing focus
-		await execAsync(`open -g "${url}"`);
+		const escapedId = thingsId.replace(/"/g, '\\"');
+
+		const script = `
+      tell application "Things3"
+        set t to to do id "${escapedId}"
+        set status of t to completed
+      end tell
+    `;
+
+		runAppleScript(script);
 	}
 
 	private formatTitle(item: GitHubItem): string {
@@ -163,7 +147,6 @@ export class ThingsClient {
 		};
 
 		const prefix = prefixes[item.type];
-		// Include repo name for context
 		const shortRepo = item.repo.split("/").pop() ?? item.repo;
 		return `${prefix}: ${item.title} (${shortRepo})`;
 	}
@@ -186,5 +169,31 @@ export class ThingsClient {
 		}
 
 		return baseTags.join(",");
+	}
+
+	/**
+	 * Find a Things task by matching title.
+	 * Used by repair-state to recover real IDs for url- mapped tasks.
+	 */
+	static findTaskByTitle(searchTitle: string): string | null {
+		const escaped = searchTitle.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+
+		const script = `
+      tell application "Things3"
+        set matches to (every to do whose name is "${escaped}")
+        if (count of matches) > 0 then
+          return id of item 1 of matches
+        else
+          return "NOT_FOUND"
+        end if
+      end tell
+    `;
+
+		try {
+			const result = runAppleScript(script);
+			return result === "NOT_FOUND" ? null : result;
+		} catch {
+			return null;
+		}
 	}
 }

@@ -10,6 +10,7 @@ import { Command } from "commander";
 import updateNotifier from "update-notifier";
 import { configCommand } from "./commands/config.js";
 import { initCommand } from "./commands/init.js";
+import { repairCommand } from "./commands/repair.js";
 import { startCommand } from "./commands/start.js";
 import { statusCommand } from "./commands/status.js";
 import { stopCommand } from "./commands/stop.js";
@@ -107,6 +108,11 @@ program
 	.description("Run a single sync (no daemon)")
 	.option("-v, --verbose", "Show detailed output")
 	.action(syncCommand);
+
+program
+	.command("repair")
+	.description("Fix broken url- task IDs by matching Things tasks")
+	.action(repairCommand);
 
 program
 	.command("config")
