@@ -32,29 +32,30 @@ export class ThingsClient {
 	}
 
 	/**
-	 * Resolve the project ID. Things' `project "Name"` is broken for URL-scheme-created
-	 * projects, so we find the project by scanning todo references or create a new one.
-	 * Stores the ID for reuse.
+	 * Resolve the project ID by searching projects directly by name (and area, if set).
+	 * Only creates a new project when none matches — prevents duplicate-project bugs
+	 * when the project temporarily has no todos in standard lists.
 	 */
 	async ensureProjectExists(): Promise<string> {
 		if (this.projectId) return this.projectId;
 
-		// Strategy 1: Find existing project by scanning todos for a matching project reference
 		const escapedName = this.projectName.replace(/"/g, '\\"');
+		const escapedArea = this.area ? this.area.replace(/"/g, '\\"') : null;
+
+		const areaCheck = escapedArea
+			? `
+              try
+                if name of area of p is "${escapedArea}" then
+                  return id of p
+                end if
+              end try`
+			: "\n              return id of p";
+
 		const findScript = `
       tell application "Things3"
-        set foundId to ""
-        repeat with l in {"Heute", "Jederzeit", "Geplant", "Irgendwann", "Eingang"}
-          repeat with t in to dos of list l
-            try
-              set projRef to project of t
-              if projRef is not missing value then
-                if name of projRef is "${escapedName}" then
-                  return id of projRef
-                end if
-              end if
-            end try
-          end repeat
+        repeat with p in projects
+          if name of p is "${escapedName}" and (status of p as string) is "open" then${areaCheck}
+          end if
         end repeat
         return "NOT_FOUND"
       end tell
@@ -70,9 +71,8 @@ export class ThingsClient {
 			// Fall through to creation
 		}
 
-		// Strategy 2: Create new project (use variable reference, not name lookup)
-		const areaAssignment = this.area
-			? `set area of newProj to area "${this.area.replace(/"/g, '\\"')}"`
+		const areaAssignment = escapedArea
+			? `set area of newProj to area "${escapedArea}"`
 			: "";
 
 		const createScript = `

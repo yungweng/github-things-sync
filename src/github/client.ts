@@ -21,6 +21,16 @@ export interface GroupedRepos {
 	[owner: string]: RepoInfo[];
 }
 
+export interface FetchResult {
+	items: GitHubItem[];
+	incomplete: boolean; // true if any underlying search query returned incomplete_results
+}
+
+interface SearchPage<T> {
+	items: T[];
+	incomplete: boolean;
+}
+
 export class GitHubClient {
 	private octokit: Octokit;
 	private username: string | null = null;
@@ -103,14 +113,15 @@ export class GitHubClient {
 	}
 
 	/**
-	 * Fetch all items we care about from GitHub
+	 * Fetch all items we care about from GitHub.
+	 * Returns `incomplete: true` if any underlying search query was flagged as
+	 * incomplete by GitHub — callers should skip reconcile/complete logic in that
+	 * case, otherwise tasks bounce (get completed and re-created on next sync).
 	 */
-	async fetchAllItems(): Promise<GitHubItem[]> {
+	async fetchAllItems(): Promise<FetchResult> {
 		const username = await this.getUsername();
-		const items: GitHubItem[] = [];
 
-		// Build list of fetch promises based on enabled sync types
-		const fetches: Promise<GitHubItem[]>[] = [];
+		const fetches: Promise<SearchPage<GitHubItem>>[] = [];
 
 		if (this.syncTypes.includes("pr-reviews")) {
 			fetches.push(this.fetchPRReviewRequests(username));
@@ -125,99 +136,107 @@ export class GitHubClient {
 			fetches.push(this.fetchIssuesCreated(username));
 		}
 
-		// Fetch in parallel
 		const results = await Promise.all(fetches);
+
+		const items: GitHubItem[] = [];
+		let incomplete = false;
 		for (const result of results) {
-			items.push(...result);
+			items.push(...result.items);
+			if (result.incomplete) incomplete = true;
 		}
 
-		// Filter by repo if configured
-		return items.filter((item) => this.shouldIncludeRepo(item.repo));
+		const filtered = items.filter((item) => this.shouldIncludeRepo(item.repo));
+		return { items: filtered, incomplete };
 	}
 
-	/**
-	 * PRs where you're requested as reviewer
-	 */
-	private async fetchPRReviewRequests(username: string): Promise<GitHubItem[]> {
+	private async runSearch(
+		q: string,
+		type: GitHubItemType,
+	): Promise<SearchPage<GitHubItem>> {
 		const { data } = await this.octokit.search.issuesAndPullRequests({
-			q: `is:pr is:open review-requested:${username}`,
+			q,
 			per_page: 100,
 		});
-
-		return data.items.map((item) => this.mapToGitHubItem(item, "pr-review"));
+		return {
+			items: data.items.map((item) => this.mapToGitHubItem(item, type)),
+			incomplete: data.incomplete_results === true,
+		};
 	}
 
-	/**
-	 * PRs you created
-	 */
-	private async fetchPRsCreated(username: string): Promise<GitHubItem[]> {
-		const { data } = await this.octokit.search.issuesAndPullRequests({
-			q: `is:pr is:open author:${username}`,
-			per_page: 100,
-		});
-
-		return data.items.map((item) => this.mapToGitHubItem(item, "pr-created"));
-	}
-
-	/**
-	 * Issues assigned to you
-	 */
-	private async fetchIssuesAssigned(username: string): Promise<GitHubItem[]> {
-		const { data } = await this.octokit.search.issuesAndPullRequests({
-			q: `is:issue is:open assignee:${username}`,
-			per_page: 100,
-		});
-
-		return data.items.map((item) =>
-			this.mapToGitHubItem(item, "issue-assigned"),
+	private fetchPRReviewRequests(username: string): Promise<SearchPage<GitHubItem>> {
+		return this.runSearch(
+			`is:pr is:open review-requested:${username}`,
+			"pr-review",
 		);
 	}
 
-	/**
-	 * Issues you created
-	 */
-	private async fetchIssuesCreated(username: string): Promise<GitHubItem[]> {
-		const { data } = await this.octokit.search.issuesAndPullRequests({
-			q: `is:issue is:open author:${username}`,
-			per_page: 100,
-		});
+	private fetchPRsCreated(username: string): Promise<SearchPage<GitHubItem>> {
+		return this.runSearch(`is:pr is:open author:${username}`, "pr-created");
+	}
 
-		return data.items.map((item) =>
-			this.mapToGitHubItem(item, "issue-created"),
+	private fetchIssuesAssigned(username: string): Promise<SearchPage<GitHubItem>> {
+		return this.runSearch(
+			`is:issue is:open assignee:${username}`,
+			"issue-assigned",
 		);
+	}
+
+	private fetchIssuesCreated(username: string): Promise<SearchPage<GitHubItem>> {
+		return this.runSearch(`is:issue is:open author:${username}`, "issue-created");
 	}
 
 	/**
 	 * Check if an item is still open
 	 */
 	async isItemOpen(item: GitHubItem): Promise<boolean> {
-		// Extract owner/repo from URL
-		// URL format: https://github.com/owner/repo/issues/123 or .../pull/123
-		const match = item.url.match(/github\.com\/([^/]+)\/([^/]+)/);
-		if (!match) return false;
+		return this.isOpenByUrl(item.url, item.type.startsWith("pr-"));
+	}
 
-		const [, owner, repo] = match;
+	/**
+	 * Verify if a GitHub item (by URL) is still open via the issues/pulls API.
+	 *
+	 * Returns:
+	 *   - true  if the API confirms `state === "open"`
+	 *   - false if the API confirms it's closed (404 included — item gone)
+	 *   - null  if the call failed for transient reasons (rate-limit, network) —
+	 *           caller should treat this as "unknown" and skip completing
+	 */
+	async verifyOpenByMapping(
+		url: string,
+		isPR: boolean,
+	): Promise<boolean | null> {
+		const match = url.match(/github\.com\/([^/]+)\/([^/]+)\/(?:issues|pull)\/(\d+)/);
+		if (!match) return null;
+
+		const [, owner, repo, numStr] = match;
+		const number = Number(numStr);
 
 		try {
-			if (item.type.startsWith("pr-")) {
+			if (isPR) {
 				const { data } = await this.octokit.pulls.get({
 					owner,
 					repo,
-					pull_number: item.number,
+					pull_number: number,
 				});
 				return data.state === "open";
 			} else {
 				const { data } = await this.octokit.issues.get({
 					owner,
 					repo,
-					issue_number: item.number,
+					issue_number: number,
 				});
 				return data.state === "open";
 			}
-		} catch {
-			// If we can't fetch, assume it's closed
-			return false;
+		} catch (error) {
+			const status = (error as { status?: number })?.status;
+			if (status === 404 || status === 410) return false;
+			return null;
 		}
+	}
+
+	private async isOpenByUrl(url: string, isPR: boolean): Promise<boolean> {
+		const result = await this.verifyOpenByMapping(url, isPR);
+		return result === true;
 	}
 
 	private mapToGitHubItem(

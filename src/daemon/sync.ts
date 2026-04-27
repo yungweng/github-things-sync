@@ -19,6 +19,7 @@ export interface SyncResult {
 	completed: number;
 	unchanged: number;
 	errors: string[];
+	skippedReconcile: boolean;
 }
 
 export async function runSync(
@@ -30,6 +31,7 @@ export async function runSync(
 		completed: 0,
 		unchanged: 0,
 		errors: [],
+		skippedReconcile: false,
 	};
 
 	const github = new GitHubClient(
@@ -46,8 +48,14 @@ export async function runSync(
 	try {
 		// Step 1: Fetch all open items from GitHub
 		if (verbose) console.log("Fetching items from GitHub...");
-		const githubItems = await github.fetchAllItems();
+		const { items: githubItems, incomplete } = await github.fetchAllItems();
 		if (verbose) console.log(`Found ${githubItems.length} open items`);
+		if (incomplete) {
+			result.skippedReconcile = true;
+			console.warn(
+				"⚠️  GitHub returned incomplete results — skipping completion step to avoid bouncing",
+			);
+		}
 
 		// Step 2: Create tasks for new items
 		for (const item of githubItems) {
@@ -82,25 +90,46 @@ export async function runSync(
 		}
 
 		// Step 3: Complete tasks for closed items
-		const state = loadState();
-		const openGithubIds = new Set(githubItems.map(makeGithubId));
+		// Skip entirely if GitHub returned incomplete results — search responses
+		// are unreliable, and completing items that just weren't in the response
+		// would cause bouncing.
+		// As a second defense, before completing any item we verify against the
+		// issues/pulls API directly — that endpoint is consistent and authoritative.
+		if (!result.skippedReconcile) {
+			const state = loadState();
+			const openGithubIds = new Set(githubItems.map(makeGithubId));
 
-		for (const [githubId, mapping] of Object.entries(state.mappings)) {
-			// Skip if item is still open
-			if (openGithubIds.has(githubId)) {
-				continue;
-			}
+			for (const [githubId, mapping] of Object.entries(state.mappings)) {
+				if (openGithubIds.has(githubId)) {
+					continue;
+				}
 
-			// Item is no longer in open list - it's been closed/merged
-			try {
-				if (verbose) console.log(`  ✅ Completing task: ${mapping.title}`);
-				await things.completeTask(mapping.thingsId);
-				removeMapping(githubId);
-				result.completed++;
-			} catch (error) {
-				const msg = `Failed to complete task ${mapping.title}: ${error}`;
-				result.errors.push(msg);
-				if (verbose) console.log(`  ❌ ${msg}`);
+				const isPR = mapping.type.startsWith("pr-");
+				const stillOpen = await github.verifyOpenByMapping(mapping.url, isPR);
+
+				if (stillOpen === true) {
+					result.unchanged++;
+					if (verbose)
+						console.log(`  ⏭️  Verified still open (search lied): ${mapping.title}`);
+					continue;
+				}
+
+				if (stillOpen === null) {
+					if (verbose)
+						console.log(`  ⏭️  Skip (verify failed): ${mapping.title}`);
+					continue;
+				}
+
+				try {
+					if (verbose) console.log(`  ✅ Completing task: ${mapping.title}`);
+					await things.completeTask(mapping.thingsId);
+					removeMapping(githubId);
+					result.completed++;
+				} catch (error) {
+					const msg = `Failed to complete task ${mapping.title}: ${error}`;
+					result.errors.push(msg);
+					if (verbose) console.log(`  ❌ ${msg}`);
+				}
 			}
 		}
 
