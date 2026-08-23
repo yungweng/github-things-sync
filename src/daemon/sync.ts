@@ -110,7 +110,9 @@ export async function runSync(
 				if (stillOpen === true) {
 					result.unchanged++;
 					if (verbose)
-						console.log(`  ⏭️  Verified still open (search lied): ${mapping.title}`);
+						console.log(
+							`  ⏭️  Verified still open (search lied): ${mapping.title}`,
+						);
 					continue;
 				}
 

@@ -163,7 +163,9 @@ export class GitHubClient {
 		};
 	}
 
-	private fetchPRReviewRequests(username: string): Promise<SearchPage<GitHubItem>> {
+	private fetchPRReviewRequests(
+		username: string,
+	): Promise<SearchPage<GitHubItem>> {
 		return this.runSearch(
 			`is:pr is:open review-requested:${username}`,
 			"pr-review",
@@ -174,15 +176,22 @@ export class GitHubClient {
 		return this.runSearch(`is:pr is:open author:${username}`, "pr-created");
 	}
 
-	private fetchIssuesAssigned(username: string): Promise<SearchPage<GitHubItem>> {
+	private fetchIssuesAssigned(
+		username: string,
+	): Promise<SearchPage<GitHubItem>> {
 		return this.runSearch(
 			`is:issue is:open assignee:${username}`,
 			"issue-assigned",
 		);
 	}
 
-	private fetchIssuesCreated(username: string): Promise<SearchPage<GitHubItem>> {
-		return this.runSearch(`is:issue is:open author:${username}`, "issue-created");
+	private fetchIssuesCreated(
+		username: string,
+	): Promise<SearchPage<GitHubItem>> {
+		return this.runSearch(
+			`is:issue is:open author:${username}`,
+			"issue-created",
+		);
 	}
 
 	/**
@@ -205,7 +214,9 @@ export class GitHubClient {
 		url: string,
 		isPR: boolean,
 	): Promise<boolean | null> {
-		const match = url.match(/github\.com\/([^/]+)\/([^/]+)\/(?:issues|pull)\/(\d+)/);
+		const match = url.match(
+			/github\.com\/([^/]+)\/([^/]+)\/(?:issues|pull)\/(\d+)/,
+		);
 		if (!match) return null;
 
 		const [, owner, repo, numStr] = match;
