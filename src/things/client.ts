@@ -108,6 +108,7 @@ export class ThingsClient {
         set proj to project id "${projId}"
         set newToDo to make new to do with properties {name:"${escapedTitle}", notes:"${escapedNotes}", tag names:"${tags}"} at beginning of proj
         schedule newToDo for current date
+        set project of newToDo to proj
         return id of newToDo
       end tell
     `;
