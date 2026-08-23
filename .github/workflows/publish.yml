@@ -34,7 +34,7 @@ jobs:
           registry-url: "https://registry.npmjs.org"
 
       - name: Upgrade npm for OIDC support
-        run: npm install -g npm@latest
+        run: npm install -g npm@11.5.1
 
       - name: Verify npm version (requires >= 11.5.1 for OIDC)
         run: |
