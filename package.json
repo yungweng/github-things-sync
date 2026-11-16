@@ -36,15 +36,15 @@
     "issues",
     "automation"
   ],
-  "author": "yungweng",
+  "author": "yonnock",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yungweng/github-things-sync.git"
+    "url": "git+https://github.com/yonnock/github-things-sync.git"
   },
-  "homepage": "https://github.com/yungweng/github-things-sync#readme",
+  "homepage": "https://github.com/yonnock/github-things-sync#readme",
   "bugs": {
-    "url": "https://github.com/yungweng/github-things-sync/issues"
+    "url": "https://github.com/yonnock/github-things-sync/issues"
   },
   "packageManager": "pnpm@10.26.2",
   "engines": {
