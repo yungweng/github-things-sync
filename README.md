@@ -3,7 +3,7 @@
 <p align="center">
   <a href="https://www.npmjs.com/package/github-things-sync"><img src="https://img.shields.io/npm/v/github-things-sync.svg" alt="npm version"></a>
   <a href="https://www.npmjs.com/package/github-things-sync"><img src="https://img.shields.io/npm/dm/github-things-sync.svg" alt="downloads"></a>
-  <a href="https://github.com/yungweng/github-things-sync/blob/main/LICENSE"><img src="https://img.shields.io/npm/l/github-things-sync.svg" alt="license"></a>
+  <a href="https://github.com/yonnock/github-things-sync/blob/main/LICENSE"><img src="https://img.shields.io/npm/l/github-things-sync.svg" alt="license"></a>
   <img src="https://img.shields.io/node/v/github-things-sync.svg" alt="node version">
 </p>
 
@@ -73,7 +73,7 @@ npx github-things-sync init
 <summary>Manual installation from source</summary>
 
 ```bash
-git clone https://github.com/yungweng/github-things-sync.git
+git clone https://github.com/yonnock/github-things-sync.git
 cd github-things-sync
 pnpm install && pnpm build
 pnpm link --global
@@ -133,7 +133,7 @@ github-things-sync config --repos=all         # Reset to sync all repos
 ## Development
 
 ```bash
-git clone https://github.com/yungweng/github-things-sync.git
+git clone https://github.com/yonnock/github-things-sync.git
 cd github-things-sync
 pnpm install
 pnpm dev sync -v  # Run sync in dev mode
@@ -141,10 +141,10 @@ pnpm dev sync -v  # Run sync in dev mode
 
 ## Contributing
 
-Found a bug or have a feature request? [Open an issue](https://github.com/yungweng/github-things-sync/issues).
+Found a bug or have a feature request? [Open an issue](https://github.com/yonnock/github-things-sync/issues).
 
 Pull requests are welcome!
 
 ## License
 
-MIT © [yungweng](https://github.com/yungweng)
+MIT © [yungweng](https://github.com/yonnock)
